@@ -299,7 +299,6 @@ export class BotBrain {
   }
 
   spend() {
-    const g = this.g;
     const me = this.me;
     const type = this.chooseType();
     const def = TOWER_TYPES[type];

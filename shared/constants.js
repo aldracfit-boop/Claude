@@ -63,10 +63,40 @@ export const TARGET_MODES = [
 ];
 
 export const DIFFICULTIES = {
-  easy: { id: 'easy', name: 'Facile', desc: 'Pour découvrir le jeu.', hp: 0.7, speed: 0.95, gold: 1.2, baseHp: 1500, startGold: 260, xp: 0.6 },
+  easy: {
+    id: 'easy',
+    name: 'Facile',
+    desc: 'Pour découvrir le jeu.',
+    hp: 0.7,
+    speed: 0.95,
+    gold: 1.2,
+    baseHp: 1500,
+    startGold: 260,
+    xp: 0.6,
+  },
   normal: { id: 'normal', name: 'Normal', desc: 'L’expérience standard.', hp: 1, speed: 1, gold: 1, baseHp: 1000, startGold: 220, xp: 1 },
-  hard: { id: 'hard', name: 'Difficile', desc: 'Ennemis plus résistants et plus rapides.', hp: 1.35, speed: 1.08, gold: 0.95, baseHp: 800, startGold: 210, xp: 1.5 },
-  nightmare: { id: 'nightmare', name: 'Cauchemar', desc: 'Pour les équipes parfaitement coordonnées.', hp: 1.5, speed: 1.12, gold: 0.9, baseHp: 600, startGold: 200, xp: 2.2 },
+  hard: {
+    id: 'hard',
+    name: 'Difficile',
+    desc: 'Ennemis plus résistants et plus rapides.',
+    hp: 1.35,
+    speed: 1.08,
+    gold: 0.95,
+    baseHp: 800,
+    startGold: 210,
+    xp: 1.5,
+  },
+  nightmare: {
+    id: 'nightmare',
+    name: 'Cauchemar',
+    desc: 'Pour les équipes parfaitement coordonnées.',
+    hp: 1.5,
+    speed: 1.12,
+    gold: 0.9,
+    baseHp: 600,
+    startGold: 200,
+    xp: 2.2,
+  },
 };
 
 export const MODES = {

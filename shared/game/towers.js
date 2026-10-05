@@ -147,7 +147,19 @@ export const TowerMixin = {
             src: t.src,
             mega,
           });
-          this.emit({ e: 'shot', k: 'shell', tw: t.id, x1: r0(t.x), y1: r0(t.y), x2: r0(tg.x), y2: r0(tg.y), tg: tg.id, sp: s.projSpeed, m: mega ? 1 : 0, l: t.level });
+          this.emit({
+            e: 'shot',
+            k: 'shell',
+            tw: t.id,
+            x1: r0(t.x),
+            y1: r0(t.y),
+            x2: r0(tg.x),
+            y2: r0(tg.y),
+            tg: tg.id,
+            sp: s.projSpeed,
+            m: mega ? 1 : 0,
+            l: t.level,
+          });
         }
         break;
       }
@@ -167,7 +179,17 @@ export const TowerMixin = {
         } else {
           this.bulletHit(target, dmg, s, t);
         }
-        this.emit({ e: 'shot', k: 'bullet', tw: t.id, x1: r0(t.x), y1: r0(t.y), x2: r0(end.x), y2: r0(end.y), c: crit ? 1 : 0, l: t.level });
+        this.emit({
+          e: 'shot',
+          k: 'bullet',
+          tw: t.id,
+          x1: r0(t.x),
+          y1: r0(t.y),
+          x2: r0(end.x),
+          y2: r0(end.y),
+          c: crit ? 1 : 0,
+          l: t.level,
+        });
         if (crit) this.emit({ e: 'hit', x: r0(target.x), y: r0(target.y), v: r0(dmg), c: 1 });
         break;
       }
@@ -192,7 +214,18 @@ export const TowerMixin = {
         } else {
           this.snipeHit(target, dmg, s, t);
         }
-        this.emit({ e: 'shot', k: 'snipe', tw: t.id, x1: r0(t.x), y1: r0(t.y), x2: r0(endX), y2: r0(endY), c: crit || charged ? 1 : 0, l: t.level, p: pierce > 1 ? 1 : 0 });
+        this.emit({
+          e: 'shot',
+          k: 'snipe',
+          tw: t.id,
+          x1: r0(t.x),
+          y1: r0(t.y),
+          x2: r0(endX),
+          y2: r0(endY),
+          c: crit || charged ? 1 : 0,
+          l: t.level,
+          p: pierce > 1 ? 1 : 0,
+        });
         this.emit({ e: 'hit', x: r0(target.x), y: r0(target.y), v: r0(dmg), c: crit || charged ? 1 : 0 });
         break;
       }
@@ -233,7 +266,17 @@ export const TowerMixin = {
       napalm: s.napalm,
       frags: s.frags,
     });
-    this.emit({ e: 'shot', k: 'mortar', tw: t.id, x1: r0(t.x), y1: r0(t.y), x2: r0(x), y2: r0(y), d: Math.round(dur * 100) / 100, l: t.level });
+    this.emit({
+      e: 'shot',
+      k: 'mortar',
+      tw: t.id,
+      x1: r0(t.x),
+      y1: r0(t.y),
+      x2: r0(x),
+      y2: r0(y),
+      d: Math.round(dur * 100) / 100,
+      l: t.level,
+    });
   },
 
   bulletHit(e, dmg, s, t) {

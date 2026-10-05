@@ -70,7 +70,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   for (const difficulty of difficulties) {
     const results = [];
     for (let i = 0; i < runs; i++) {
-      const r = runGame({ seed: 1000 + i * 77, difficulty, players: nPlayers, mode, skill, verbose, tuning: { hp: hpTune, gold: goldTune } });
+      const r = runGame({
+        seed: 1000 + i * 77,
+        difficulty,
+        players: nPlayers,
+        mode,
+        skill,
+        verbose,
+        tuning: { hp: hpTune, gold: goldTune },
+      });
       results.push(r);
       console.log(
         `[${difficulty}] partie ${i + 1}: ${r.victory ? 'VICTOIRE' : 'défaite'} vague ${r.wave} base ${r.hp} ` +
@@ -80,6 +88,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const wins = results.filter((r) => r.victory).length;
     const avgWave = results.reduce((a, r) => a + r.wave, 0) / results.length;
     const avgHp = results.reduce((a, r) => a + r.hpPct, 0) / results.length;
-    console.log(`==> ${difficulty} / ${nPlayers} joueurs : ${wins}/${runs} victoires, vague moyenne ${avgWave.toFixed(1)}, base restante moyenne ${Math.round(avgHp * 100)} %\n`);
+    console.log(
+      `==> ${difficulty} / ${nPlayers} joueurs : ${wins}/${runs} victoires, vague moyenne ${avgWave.toFixed(1)}, base restante moyenne ${Math.round(avgHp * 100)} %\n`,
+    );
   }
 }

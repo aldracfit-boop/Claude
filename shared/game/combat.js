@@ -110,7 +110,12 @@ export const CombatMixin = {
         }
       }
     }
-    this.emit({ e: 'combo', x: Math.round(e.x), y: Math.round(e.y), n: combo, coop: coop ? 1 : 0 });
+    // Les statistiques comptent chaque combo, mais l'affichage est limité pour rester lisible.
+    const key = coop ? 'coopComboT' : 'comboEmitT';
+    if (this.time - (this[key] ?? -99) >= (coop ? 0.35 : 0.5)) {
+      this[key] = this.time;
+      this.emit({ e: 'combo', x: Math.round(e.x), y: Math.round(e.y), n: combo, coop: coop ? 1 : 0 });
+    }
   },
 
   applySlow(e, pct, t, src) {

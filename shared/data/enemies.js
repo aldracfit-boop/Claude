@@ -124,7 +124,17 @@ export const ENEMY_TYPES = {
     phases: [
       { at: 1.0, name: 'Éveil', stompCd: 9, stompR: 130, stompDur: 5 },
       { at: 0.66, name: 'Renforts', stompCd: 7, stompR: 140, stompDur: 5, summonCd: 8, summon: { type: 'runner', count: 4 } },
-      { at: 0.33, name: 'Rage', stompCd: 5, stompR: 165, stompDur: 6, summonCd: 7, summon: { type: 'tank', count: 1 }, speedMult: 1.6, armorAdd: 4 },
+      {
+        at: 0.33,
+        name: 'Rage',
+        stompCd: 5,
+        stompR: 165,
+        stompDur: 6,
+        summonCd: 7,
+        summon: { type: 'tank', count: 1 },
+        speedMult: 1.6,
+        armorAdd: 4,
+      },
     ],
   },
 };

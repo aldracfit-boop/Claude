@@ -64,58 +64,121 @@ export const BASE_CANNON = {
   range: 190,
 };
 
-// Synergies de composition : comptées en « puissance » = somme des niveaux des tourelles
-// d'un type, toutes équipes confondues.
+// Synergies de composition : comptées en « équivalents niveau 1 » (une tourelle de niveau L
+// vaut 3^(L-1)), toutes équipes confondues. Ainsi, fusionner ne fait jamais perdre une synergie.
+export function synergyWeight(level) {
+  return Math.pow(3, level - 1);
+}
+export const FRATERNITY_NEED = 6;
+
 export const SYNERGIES = [
   {
-    id: 'battery', name: 'Batterie', icon: '🎯', type: 'canon', need: 4,
+    id: 'battery',
+    name: 'Batterie',
+    icon: '🎯',
+    type: 'canon',
+    need: 6,
     desc: 'Canons : +15 % de cadence.',
-    apply: (s, t) => { if (t.type === 'canon') s.rate *= 1.15; },
+    apply: (s, t) => {
+      if (t.type === 'canon') s.rate *= 1.15;
+    },
   },
   {
-    id: 'battery2', name: 'Batterie lourde', icon: '🎯', type: 'canon', need: 9,
+    id: 'battery2',
+    name: 'Batterie lourde',
+    icon: '🎯',
+    type: 'canon',
+    need: 20,
     desc: 'Canons : +20 % de dégâts.',
-    apply: (s, t) => { if (t.type === 'canon') s.damage *= 1.2; },
+    apply: (s, t) => {
+      if (t.type === 'canon') s.damage *= 1.2;
+    },
   },
   {
-    id: 'bullets', name: 'Pluie de balles', icon: '🔫', type: 'mg', need: 4,
+    id: 'bullets',
+    name: 'Pluie de balles',
+    icon: '🔫',
+    type: 'mg',
+    need: 6,
     desc: 'Mitrailleuses : +2 perforation d’armure.',
-    apply: (s, t) => { if (t.type === 'mg') s.armorPierce += 2; },
+    apply: (s, t) => {
+      if (t.type === 'mg') s.armorPierce += 2;
+    },
   },
   {
-    id: 'bullets2', name: 'Mur de plomb', icon: '🔫', type: 'mg', need: 9,
+    id: 'bullets2',
+    name: 'Mur de plomb',
+    icon: '🔫',
+    type: 'mg',
+    need: 20,
     desc: 'Mitrailleuses : +20 % de cadence.',
-    apply: (s, t) => { if (t.type === 'mg') s.rate *= 1.2; },
+    apply: (s, t) => {
+      if (t.type === 'mg') s.rate *= 1.2;
+    },
   },
   {
-    id: 'lynx', name: 'Œil de lynx', icon: '🔭', type: 'sniper', need: 4,
+    id: 'lynx',
+    name: 'Œil de lynx',
+    icon: '🔭',
+    type: 'sniper',
+    need: 6,
     desc: 'Snipers : +12 % de portée.',
-    apply: (s, t) => { if (t.type === 'sniper') s.range *= 1.12; },
+    apply: (s, t) => {
+      if (t.type === 'sniper') s.range *= 1.12;
+    },
   },
   {
-    id: 'lynx2', name: 'Tireurs d’élite', icon: '🔭', type: 'sniper', need: 9,
+    id: 'lynx2',
+    name: 'Tireurs d’élite',
+    icon: '🔭',
+    type: 'sniper',
+    need: 20,
     desc: 'Snipers : +10 % de chances de critique.',
-    apply: (s, t) => { if (t.type === 'sniper') s.crit += 0.1; },
+    apply: (s, t) => {
+      if (t.type === 'sniper') s.crit += 0.1;
+    },
   },
   {
-    id: 'artillery', name: 'Artillerie lourde', icon: '💣', type: 'mortar', need: 4,
+    id: 'artillery',
+    name: 'Artillerie lourde',
+    icon: '💣',
+    type: 'mortar',
+    need: 6,
     desc: 'Mortiers : +20 % de rayon d’explosion.',
-    apply: (s, t) => { if (t.type === 'mortar') s.splash *= 1.2; },
+    apply: (s, t) => {
+      if (t.type === 'mortar') s.splash *= 1.2;
+    },
   },
   {
-    id: 'artillery2', name: 'Pilonnage', icon: '💣', type: 'mortar', need: 9,
+    id: 'artillery2',
+    name: 'Pilonnage',
+    icon: '💣',
+    type: 'mortar',
+    need: 20,
     desc: 'Mortiers : +20 % de dégâts.',
-    apply: (s, t) => { if (t.type === 'mortar') s.damage *= 1.2; },
+    apply: (s, t) => {
+      if (t.type === 'mortar') s.damage *= 1.2;
+    },
   },
   {
-    id: 'arsenal', name: 'Arsenal complet', icon: '🧰', special: 'arsenal',
+    id: 'arsenal',
+    name: 'Arsenal complet',
+    icon: '🧰',
+    special: 'arsenal',
     desc: 'Au moins une tourelle de chaque type : +8 % de dégâts pour toutes les tourelles.',
-    apply: (s) => { s.damage *= 1.08; },
+    apply: (s) => {
+      s.damage *= 1.08;
+    },
   },
   {
-    id: 'fraternity', name: 'Fraternité', icon: '🤝', special: 'fraternity',
-    desc: 'Au moins 2 joueurs ont chacun 4 niveaux de tourelles : +5 % de cadence pour toutes.',
-    apply: (s) => { s.rate *= 1.05; },
+    id: 'fraternity',
+    name: 'Fraternité',
+    icon: '🤝',
+    special: 'fraternity',
+    desc: 'Au moins 2 joueurs possèdent chacun l’équivalent de 6 tourelles : +5 % de cadence pour toutes.',
+    apply: (s) => {
+      s.rate *= 1.05;
+    },
   },
 ];
 

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, CELL } from '../shared/game/Game.js';
 import { BotBrain } from '../shared/game/bot.js';
-import { DT, PHASE, COLS, ROWS, TILE } from '../shared/constants.js';
+import { DT, PHASE, COLS, ROWS } from '../shared/constants.js';
 import { TOWER_TYPES } from '../shared/data/towers.js';
 import { upgradeCost, upgradeSlots, sellValue } from '../shared/game/stats.js';
 
@@ -41,7 +41,11 @@ test('placement : coût, case invalide, or insuffisant', () => {
   assert.ok(ev.some((e) => e.e === 'err' && e.p === 1));
   // case de chemin
   let pathTile = null;
-  for (let i = 0; i < g.grid.length; i++) if (g.grid[i] === CELL.PATH) { pathTile = [i % COLS, (i / COLS) | 0]; break; }
+  for (let i = 0; i < g.grid.length; i++)
+    if (g.grid[i] === CELL.PATH) {
+      pathTile = [i % COLS, (i / COLS) | 0];
+      break;
+    }
   ev = run(g, [[0, { a: 'place', tt: 'canon', c: pathTile[0], r: pathTile[1] }]]);
   assert.ok(ev.some((e) => e.e === 'err'));
   // or insuffisant
@@ -153,7 +157,10 @@ test('améliorations : emplacements limités, coût croissant, remboursement à 
   assert.ok(c2 > c1, 'le coût augmente');
   for (let i = 1; i < slots; i++) run(g, [[0, { a: 'upgrade', id: a.id, s: 'range' }]]);
   const ev = run(g, [[0, { a: 'upgrade', id: a.id, s: 'rate' }]]);
-  assert.ok(ev.some((e) => e.e === 'err'), 'plus d’emplacement');
+  assert.ok(
+    ev.some((e) => e.e === 'err'),
+    'plus d’emplacement',
+  );
   const spent = a.upSpend[0];
   const before = g.players[0].gold;
   const b = place(g, 0, 'canon', tiles[1]);
@@ -229,7 +236,10 @@ test('déroulement : préparation -> vague quand tout le monde est prêt -> réc
 
 test('armure : réduit chaque coup, brisure d’armure + sniper = combo', () => {
   const g = newGame();
-  run(g, [[0, { a: 'ready' }], [1, { a: 'ready' }]]);
+  run(g, [
+    [0, { a: 'ready' }],
+    [1, { a: 'ready' }],
+  ]);
   const e = g.spawnEnemy('tank');
   const hp0 = e.hp;
   g.damageEnemy(e, 4, { owners: [0], kind: 'bullet', armorPierce: 0 });
@@ -246,7 +256,10 @@ test('armure : réduit chaque coup, brisure d’armure + sniper = combo', () => 
 
 test('boss : impossible de sauter une phase', () => {
   const g = newGame();
-  run(g, [[0, { a: 'ready' }], [1, { a: 'ready' }]]);
+  run(g, [
+    [0, { a: 'ready' }],
+    [1, { a: 'ready' }],
+  ]);
   const boss = g.spawnEnemy('colossus', { phases: 3 });
   g.damageEnemy(boss, boss.maxHp * 10, { owners: [0], kind: 'snipe', armorPierce: 99 });
   assert.equal(boss.dead, false);
@@ -261,7 +274,10 @@ test('le piétinement du Colosse neutralise les tourelles proches', () => {
   g.players[0].gold = 10000;
   const tiles = freeTiles(g, 1);
   const t = place(g, 0, 'canon', tiles[0]);
-  run(g, [[0, { a: 'ready' }], [1, { a: 'ready' }]]);
+  run(g, [
+    [0, { a: 'ready' }],
+    [1, { a: 'ready' }],
+  ]);
   const boss = g.spawnEnemy('colossus');
   boss.x = t.x;
   boss.y = t.y;
@@ -271,7 +287,10 @@ test('le piétinement du Colosse neutralise les tourelles proches', () => {
 
 test('défaite quand la base tombe à 0', () => {
   const g = newGame();
-  run(g, [[0, { a: 'ready' }], [1, { a: 'ready' }]]);
+  run(g, [
+    [0, { a: 'ready' }],
+    [1, { a: 'ready' }],
+  ]);
   g.base.hp = 1;
   const e = g.spawnEnemy('runner');
   g.enemyReachBase(e);
@@ -281,7 +300,10 @@ test('défaite quand la base tombe à 0', () => {
 
 test('victoire après la dernière vague de campagne', () => {
   const g = newGame();
-  run(g, [[0, { a: 'ready' }], [1, { a: 'ready' }]]);
+  run(g, [
+    [0, { a: 'ready' }],
+    [1, { a: 'ready' }],
+  ]);
   g.wave = 20;
   g.waveState.qi = g.waveState.queue.length;
   for (const e of g.enemies) e.dead = true;
@@ -294,8 +316,14 @@ test('victoire après la dernière vague de campagne', () => {
 test('capacités : recharge et phase de vague', () => {
   const g = newGame();
   let ev = run(g, [[0, { a: 'ability', i: 1 }]]);
-  assert.ok(ev.some((e) => e.e === 'err'), 'pas pendant la préparation');
-  run(g, [[0, { a: 'ready' }], [1, { a: 'ready' }]]);
+  assert.ok(
+    ev.some((e) => e.e === 'err'),
+    'pas pendant la préparation',
+  );
+  run(g, [
+    [0, { a: 'ready' }],
+    [1, { a: 'ready' }],
+  ]);
   ev = run(g, [[0, { a: 'ability', i: 1 }]]);
   assert.ok(ev.some((e) => e.e === 'freeze'));
   ev = run(g, [[0, { a: 'ability', i: 1 }]]);
@@ -322,21 +350,41 @@ test('synergies et bonus de proximité entre joueurs', () => {
   g.players[1].gold = 10000;
   // deux cases adjacentes
   let pair = null;
-  for (let r = 0; r < ROWS && !pair; r++) for (let c = 0; c < COLS - 1 && !pair; c++) if (g.isBuildable(c, r) && g.isBuildable(c + 1, r)) pair = [[c, r], [c + 1, r]];
+  for (let r = 0; r < ROWS && !pair; r++)
+    for (let c = 0; c < COLS - 1 && !pair; c++)
+      if (g.isBuildable(c, r) && g.isBuildable(c + 1, r))
+        pair = [
+          [c, r],
+          [c + 1, r],
+        ];
   const a = place(g, 0, 'canon', pair[0]);
   const b = place(g, 1, 'sniper', pair[1]);
   assert.equal(a.link, 0.1);
   assert.equal(b.link, 0.1);
-  const tiles = freeTiles(g, 4);
+  const tiles = freeTiles(g, 5);
   for (const tl of tiles) place(g, 0, 'canon', tl);
+  assert.ok(g.synergies.has('battery'), '6 canons niveau 1 activent Batterie');
+});
+
+test('fusionner ne fait pas perdre une synergie', () => {
+  const g = newGame();
+  g.players[0].gold = 10000;
+  const tiles = freeTiles(g, 6);
+  const ts = tiles.map((tl) => place(g, 0, 'canon', tl));
   assert.ok(g.synergies.has('battery'));
+  run(g, [[0, { a: 'fuse', id: ts[0].id, partners: [ts[1].id, ts[2].id] }]]);
+  assert.equal(g.towers.length, 4);
+  assert.ok(g.synergies.has('battery'), 'toujours active après fusion');
 });
 
 test('instantané sérialisable en JSON', () => {
   const g = newGame();
   const [tl] = freeTiles(g, 1);
   place(g, 0, 'canon', tl);
-  run(g, [[0, { a: 'ready' }], [1, { a: 'ready' }]]);
+  run(g, [
+    [0, { a: 'ready' }],
+    [1, { a: 'ready' }],
+  ]);
   for (let i = 0; i < 60; i++) g.step(DT);
   const snap = g.snapshot(true);
   const json = JSON.stringify(snap);
@@ -348,7 +396,17 @@ test('instantané sérialisable en JSON', () => {
 
 test('commandes malformées ignorées sans planter', () => {
   const g = newGame();
-  const bad = [null, 42, {}, { a: 5 }, { a: 'place' }, { a: 'fuse', id: 'x', partners: 'y' }, { a: 'upgrade', id: 1e9, s: '__proto__' }, { a: 'gift', to: -1, v: 1e9 }, { a: 'chat', m: 'x'.repeat(5000) }];
+  const bad = [
+    null,
+    42,
+    {},
+    { a: 5 },
+    { a: 'place' },
+    { a: 'fuse', id: 'x', partners: 'y' },
+    { a: 'upgrade', id: 1e9, s: '__proto__' },
+    { a: 'gift', to: -1, v: 1e9 },
+    { a: 'chat', m: 'x'.repeat(5000) },
+  ];
   for (const c of bad) g.command(0, c);
   g.command(9, { a: 'ready' });
   assert.doesNotThrow(() => g.step(DT));

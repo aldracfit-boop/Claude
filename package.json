@@ -8,7 +8,9 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test test/*.test.js",
-    "simulate": "node tools/simulate.js"
+    "simulate": "node tools/simulate.js",
+    "lint": "npx --yes eslint@9 client shared server tools test",
+    "format": "npx --yes prettier@3 --write \"client/**/*.{js,css,html}\" \"shared/**/*.js\" \"server/**/*.js\" \"tools/**/*.js\" \"test/**/*.js\""
   },
   "engines": {
     "node": ">=18"

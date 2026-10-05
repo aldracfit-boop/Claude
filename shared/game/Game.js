@@ -2,16 +2,31 @@
 // directement dans le navigateur (solo / local). Aucune dépendance au DOM.
 
 import {
-  TILE, COLS, ROWS, WORLD_W, WORLD_H, MAX_PLAYERS, PLAYER_COLORS, PHASE, RARITIES,
-  DIFFICULTIES, MODES, CAMPAIGN_WAVES, PLAYER_HP_SCALE, TARGET_MODES, UPGRADE_STATS,
-  BRANCH_LEVEL, SELL_REFUND, QUICK_CHAT,
+  TILE,
+  COLS,
+  ROWS,
+  WORLD_W,
+  WORLD_H,
+  MAX_PLAYERS,
+  PLAYER_COLORS,
+  PHASE,
+  RARITIES,
+  DIFFICULTIES,
+  MODES,
+  CAMPAIGN_WAVES,
+  PLAYER_HP_SCALE,
+  TARGET_MODES,
+  UPGRADE_STATS,
+  BRANCH_LEVEL,
+  SELL_REFUND,
+  QUICK_CHAT,
 } from '../constants.js';
 import { MAPS, DEFAULT_MAP } from '../data/maps.js';
 import { TOWER_TYPES } from '../data/towers.js';
 import { ENEMY_INDEX } from '../data/enemies.js';
 import { getWaveDef, prepTime, waveReward, teamWaveReward, hpMult, countMult, intervalMult } from '../data/waves.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
-import { TEAM_ITEMS, SYNERGIES, ABILITIES, COOP } from '../data/team.js';
+import { TEAM_ITEMS, SYNERGIES, ABILITIES, COOP, synergyWeight, FRATERNITY_NEED } from '../data/team.js';
 import { RNG, buildPath, sanitizeName, sanitizeText, clamp } from '../util.js';
 import { computeTowerStats, upgradeCost, upgradeSlots, upgradesUsed } from './stats.js';
 import { CombatMixin } from './combat.js';
@@ -151,8 +166,19 @@ export class Game {
       chatT: 0,
       pingT: 0,
       stats: {
-        kills: 0, damage: 0, gold: 0, built: 0, fusions: 0, coopFusions: 0,
-        combos: 0, coopCombos: 0, abilities: 0, upgrades: 0, gifts: 0, bosses: 0, teamBuys: 0,
+        kills: 0,
+        damage: 0,
+        gold: 0,
+        built: 0,
+        fusions: 0,
+        coopFusions: 0,
+        combos: 0,
+        coopCombos: 0,
+        abilities: 0,
+        upgrades: 0,
+        gifts: 0,
+        bosses: 0,
+        teamBuys: 0,
       },
     };
   }
@@ -194,7 +220,7 @@ export class Game {
     for (const [pid, c] of q) {
       try {
         this.execCommand(pid, c);
-      } catch (err) {
+      } catch {
         this.error(pid, 'Commande invalide.');
       }
     }
@@ -204,22 +230,38 @@ export class Game {
     const over = this.phase === PHASE.VICTORY || this.phase === PHASE.DEFEAT;
     if (over && c.a !== 'chat' && c.a !== 'ping') return;
     switch (c.a) {
-      case 'place': return this.cmdPlace(pid, c);
-      case 'upgrade': return this.cmdUpgrade(pid, c);
-      case 'sell': return this.cmdSell(pid, c);
-      case 'move': return this.cmdMove(pid, c);
-      case 'target': return this.cmdTarget(pid, c);
-      case 'branch': return this.cmdBranch(pid, c);
-      case 'fuse': return this.cmdFuse(pid, c);
-      case 'fuseReply': return this.cmdFuseReply(pid, c);
-      case 'ready': return this.cmdReady(pid, c);
-      case 'ability': return this.cmdAbility(pid, c);
-      case 'team': return this.cmdTeam(pid, c);
-      case 'gift': return this.cmdGift(pid, c);
-      case 'chat': return this.cmdChat(pid, c);
-      case 'ping': return this.cmdPing(pid, c);
-      case 'speed': return this.cmdSpeed(pid, c);
-      default: return this.error(pid, 'Commande inconnue.');
+      case 'place':
+        return this.cmdPlace(pid, c);
+      case 'upgrade':
+        return this.cmdUpgrade(pid, c);
+      case 'sell':
+        return this.cmdSell(pid, c);
+      case 'move':
+        return this.cmdMove(pid, c);
+      case 'target':
+        return this.cmdTarget(pid, c);
+      case 'branch':
+        return this.cmdBranch(pid, c);
+      case 'fuse':
+        return this.cmdFuse(pid, c);
+      case 'fuseReply':
+        return this.cmdFuseReply(pid, c);
+      case 'ready':
+        return this.cmdReady(pid, c);
+      case 'ability':
+        return this.cmdAbility(pid, c);
+      case 'team':
+        return this.cmdTeam(pid, c);
+      case 'gift':
+        return this.cmdGift(pid, c);
+      case 'chat':
+        return this.cmdChat(pid, c);
+      case 'ping':
+        return this.cmdPing(pid, c);
+      case 'speed':
+        return this.cmdSpeed(pid, c);
+      default:
+        return this.error(pid, 'Commande inconnue.');
     }
   }
 
@@ -522,14 +564,15 @@ export class Game {
     const power = { canon: 0, mg: 0, sniper: 0, mortar: 0 };
     const ppower = this.players.map(() => 0);
     for (const t of this.towers) {
-      power[t.type] = (power[t.type] || 0) + t.level;
-      for (const o of t.owners) ppower[o] += t.level / t.owners.length;
+      const w = synergyWeight(t.level);
+      power[t.type] = (power[t.type] || 0) + w;
+      for (const o of t.owners) ppower[o] += w / t.owners.length;
     }
     const active = new Set();
     for (const syn of SYNERGIES) {
       if (syn.type && power[syn.type] >= syn.need) active.add(syn.id);
       else if (syn.special === 'arsenal' && Object.values(power).every((v) => v > 0)) active.add(syn.id);
-      else if (syn.special === 'fraternity' && ppower.filter((v) => v >= 4).length >= 2) active.add(syn.id);
+      else if (syn.special === 'fraternity' && ppower.filter((v) => v >= FRATERNITY_NEED).length >= 2) active.add(syn.id);
     }
     for (const id of active) if (!this.synergies.has(id)) this.emit({ e: 'synergy', id, on: 1 });
     for (const id of this.synergies) if (!active.has(id)) this.emit({ e: 'synergy', id, on: 0 });
@@ -711,9 +754,17 @@ export class Game {
       players: this.players.map((p) => {
         const s = p.stats;
         const xp = Math.round(
-          (cleared * 12 + s.kills * 0.15 + s.bosses * 60 + s.fusions * 4 + s.coopFusions * 10 + s.coopCombos * 0.5 + (victory ? 250 : 0)) * diffXp,
+          (cleared * 12 + s.kills * 0.15 + s.bosses * 60 + s.fusions * 4 + s.coopFusions * 10 + s.coopCombos * 0.5 + (victory ? 250 : 0)) *
+            diffXp,
         );
-        return { id: p.id, name: p.name, color: p.color, bot: p.bot, xp, stats: { ...s, damage: Math.round(s.damage), gold: Math.round(s.gold) } };
+        return {
+          id: p.id,
+          name: p.name,
+          color: p.color,
+          bot: p.bot,
+          xp,
+          stats: { ...s, damage: Math.round(s.damage), gold: Math.round(s.gold) },
+        };
       }),
     };
     for (const e of this.enemies) e.dead = true;
@@ -878,11 +929,28 @@ export class Game {
       })),
       enemies: this.enemies
         .filter((e) => !e.dead)
-        .map((e) => [e.id, ENEMY_INDEX[e.type], Math.round(e.x), Math.round(e.y), Math.ceil(e.hp), Math.ceil(e.maxHp), this.enemyFlags(e), Math.round(e.armor)]),
+        .map((e) => [
+          e.id,
+          ENEMY_INDEX[e.type],
+          Math.round(e.x),
+          Math.round(e.y),
+          Math.ceil(e.hp),
+          Math.ceil(e.maxHp),
+          this.enemyFlags(e),
+          Math.round(e.armor),
+        ]),
       boss: this.bossInfo(),
       reqs: this.fusionRequests.map((r) => ({
-        id: r.id, from: r.from, primary: r.primary, partners: r.partners, core: r.core ? 1 : 0,
-        need: r.need, acc: r.acc, t: Math.ceil(r.t), tt: r.type, l: r.level,
+        id: r.id,
+        from: r.from,
+        primary: r.primary,
+        partners: r.partners,
+        core: r.core ? 1 : 0,
+        need: r.need,
+        acc: r.acc,
+        t: Math.ceil(r.t),
+        tt: r.type,
+        l: r.level,
       })),
       syn: [...this.synergies],
       next: this.nextPreview,
