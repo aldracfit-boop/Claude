@@ -16,10 +16,12 @@ import {
 } from '../../shared/constants.js';
 import { TOWER_TYPES, TOWER_LIST } from '../../shared/data/towers.js';
 import { ENEMY_TYPES, ENEMY_IDS } from '../../shared/data/enemies.js';
-import { TEAM_ITEMS, TEAM_ITEM_IDS, SYNERGIES, ABILITIES, synergyWeight } from '../../shared/data/team.js';
+import { TEAM_ITEMS, TEAM_ITEM_IDS, SYNERGIES, ABILITIES, synergyPower, ARSENAL_NEED } from '../../shared/data/team.js';
 import { upgradeCost, upgradeSlots } from '../../shared/game/stats.js';
 import { towerIcon, enemyIcon } from './render/sprites.js';
 import { WAVE_EVENTS, MERCHANT_DEALS, POLISH_MAX_RARITY } from '../../shared/data/events.js';
+import { recipesFor, findRecipe, HYBRID_MIN_LEVEL } from '../../shared/data/recipes.js';
+import { profile } from './profile.js';
 
 const ENEMY_DEFS = ENEMY_IDS.map((id) => ENEMY_TYPES[id]);
 
@@ -402,8 +404,7 @@ export class Hud {
 
   updateSynergies(state) {
     const snap = state.snap;
-    const power = { canon: 0, mg: 0, sniper: 0, mortar: 0 };
-    for (const t of state.towers.values()) power[t.tt] += synergyWeight(t.l);
+    const power = synergyPower([...state.towers.values()].map((t) => ({ type: t.tt, level: t.l })));
     const active = new Set(snap.syn);
     const key = JSON.stringify(power) + snap.syn.join(',');
     if (key === this.synKey) return;
@@ -412,9 +413,10 @@ export class Hud {
     for (const s of SYNERGIES) {
       let progress = '';
       if (s.type) progress = `${Math.min(power[s.type], s.need)}/${s.need}`;
-      else if (s.special === 'arsenal') progress = `${Object.values(power).filter((v) => v > 0).length}/4`;
+      else if (s.special === 'arsenal')
+        progress = `${Math.min(ARSENAL_NEED, Object.values(power).filter((v) => v > 0).length)}/${ARSENAL_NEED}`;
       const on = active.has(s.id);
-      if (!on && s.type && power[s.type] === 0 && s.need > 6) continue;
+      if (!on && s.type && power[s.type] === 0) continue;
       box.append(
         h(
           `div.syn${on ? '.on' : ''}`,
@@ -548,7 +550,7 @@ export class Hud {
       h('div.subttl', 'Comment jouer'),
       h(
         'div.hint-line',
-        h('div', '• Choisissez une tourelle (1-4) puis cliquez sur une case libre.'),
+        h('div', '• Choisissez une tourelle (1-6) puis cliquez sur une case libre.'),
         h('div', '• Cliquez sur une tourelle pour l’améliorer, la spécialiser ou la fusionner.'),
         h('div', `• ${FUSION_COUNT} tourelles identiques (type + niveau) → 1 tourelle de niveau supérieur.`),
         h('div', '• Les tourelles de joueurs différents proches gagnent +10 % de dégâts.'),
@@ -629,6 +631,9 @@ export class Hud {
     if (st.ap) extra.push(h('div', 'Perce-armure', h('b', String(st.ap))));
     if (st.pierce > 1) extra.push(h('div', 'Traverse', h('b', st.pierce > 10 ? 'tous' : `${st.pierce}`)));
     if (st.multi > 1) extra.push(h('div', 'Cibles', h('b', `×${st.multi}`)));
+    if (st.chains) extra.push(h('div', 'Rebonds', h('b', String(st.chains))));
+    if (st.slow) extra.push(h('div', 'Ralentit', h('b', `${st.slow} %`)));
+    if (st.stun) extra.push(h('div', 'Paralyse', h('b', `${st.stun} s`)));
     const bonus = [];
     if (t.lk) bonus.push(`🤝 Lien d’équipe +${Math.round(t.lk * 100)} %`);
     if (t.au) bonus.push(`✨ Aura légendaire +${Math.round(t.au * 100)} %`);
@@ -688,7 +693,15 @@ export class Hud {
     panel.append(h('div.subttl', mine ? 'Améliorations' : 'Offrir une amélioration', h('span', `${used}/${slots} emplacements`)), upRow);
 
     // Spécialisation
-    if (t.l >= BRANCH_LEVEL && !t.b && mine) {
+    if (def.hybrid) {
+      panel.append(
+        h(
+          'div.hint-line',
+          { style: { color: 'var(--team)' } },
+          `⚗️ Tourelle hybride (${def.role}) : pas de spécialisation, mais des traits uniques.`,
+        ),
+      );
+    } else if (t.l >= BRANCH_LEVEL && !t.b && mine) {
       panel.append(
         h('div.subttl', '⭐ Spécialisation (irréversible)'),
         h(
@@ -710,6 +723,7 @@ export class Hud {
     } else if (t.l < BRANCH_LEVEL) {
       panel.append(h('div.hint-line', `⭐ Spécialisation débloquée au niveau ${BRANCH_LEVEL}.`));
     }
+    if (st.detect) panel.append(h('div.hint-line', '👁️ Détecte les ennemis furtifs à portée (pour toute l’équipe).'));
 
     // Traits
     panel.append(
@@ -765,6 +779,12 @@ export class Hud {
       panel.append(box);
     }
 
+    // Fusion avancée (hybrides)
+    if (!def.hybrid && mine) {
+      const adv = this.advancedFusion(state, t, ui);
+      if (adv) panel.append(adv);
+    }
+
     // Actions
     const acts = h('div.actions-row');
     if (mine) {
@@ -797,6 +817,62 @@ export class Hud {
     return panel;
   }
 
+  advancedFusion(state, t, ui) {
+    const me = { type: t.tt, level: t.l, branch: t.b };
+    const recipes = recipesFor(t.tt).filter((r) => !r.aBranch || (r.a === t.tt && r.aBranch === t.b) || r.b === t.tt);
+    if (!recipes.length) return null;
+    const box = h('div.fusion-box', { style: { borderColor: 'rgba(199, 146, 234, 0.55)', background: 'rgba(199, 146, 234, 0.06)' } });
+    box.append(h('div.subttl', '⚗️ Fusion avancée (2 tourelles différentes)'));
+    const seen = new Set();
+    for (const r of recipes) {
+      const partnerType = r.a === t.tt ? r.b : r.a;
+      if (seen.has(partnerType + (r.aBranch || ''))) continue;
+      const own = [];
+      const team = [];
+      for (const u of state.towers.values()) {
+        if (u.id === t.id || u.tt !== partnerType) continue;
+        const rec = findRecipe(me, { type: u.tt, level: u.l, branch: u.b });
+        if (!rec || rec.id !== r.id) continue;
+        const uo = u.os || [u.o];
+        if (uo.length === 1 && uo[0] === ui.me) own.push(u);
+        else team.push(u);
+      }
+      // la recette secrète n'apparaît que si elle est réellement possible
+      if (r.secret && !own.length && !team.length && !profile.data.discovered.includes(`recipe-${r.id}`)) continue;
+      seen.add(partnerType + (r.aBranch || ''));
+      const known = profile.data.discovered.includes(`recipe-${r.id}`);
+      const result = known ? TOWER_TYPES[r.result].name : '???';
+      const pname =
+        TOWER_TYPES[partnerType].name + (r.aBranch && r.a === partnerType ? ` (${TOWER_TYPES[partnerType].branches[r.aBranch].name})` : '');
+      const btn = h(
+        'button.btn.small',
+        {
+          title: known ? TOWER_TYPES[r.result].desc : 'Recette encore inconnue : essayez-la !',
+          onclick: () =>
+            own.length
+              ? this.actions.hybrid(t.id, own[0].id)
+              : this.actions.teamHybrid(
+                  t.id,
+                  team.map((u) => u.id),
+                ),
+        },
+        `+ ${pname} niv. ${t.l} → ${result}`,
+      );
+      btn.disabled = t.l < HYBRID_MIN_LEVEL || (!own.length && !team.length);
+      box.append(btn);
+    }
+    if (!seen.size) return null;
+    box.append(
+      h(
+        'div.hint-line',
+        t.l < HYBRID_MIN_LEVEL
+          ? `Disponible à partir du niveau ${HYBRID_MIN_LEVEL}, avec une tourelle du même niveau.`
+          : 'La tourelle hybride garde le niveau des ingrédients. Celles des alliés demandent leur accord.',
+      ),
+    );
+    return box;
+  }
+
   // ------------------------------------------------------------ Demandes de fusion
   updateFusionRequests(state, ui) {
     const snap = state.snap;
@@ -821,7 +897,9 @@ export class Hud {
         h(
           'p',
           h('b', { style: { color: from.color } }, from.name),
-          ` propose de fusionner des ${def.name} niveau ${req.l} → niveau ${req.l + 1}. `,
+          req.hy
+            ? ` propose une fusion avancée : sa tourelle ${def.name} niveau ${req.l} + la vôtre → ${profile.data.discovered.includes(`recipe-${req.hy}`) ? TOWER_TYPES[req.hy].name : 'hybride inconnue'}. `
+            : ` propose de fusionner des ${def.name} niveau ${req.l} → niveau ${req.l + 1}. `,
           `La nouvelle tourelle sera partagée (+10 % de dégâts).`,
           locals.length > 1
             ? h('div', { style: { marginTop: '4px', color: 'var(--text)' } }, `Réponse attendue de : ${snap.players[target].name}`)

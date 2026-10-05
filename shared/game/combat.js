@@ -16,6 +16,7 @@ export const CombatMixin = {
     if (src.kind !== 'burn') {
       if (st.mark) dmg *= 1.2;
       if (st.brk) dmg *= 1.2;
+      if (st.chill) dmg *= 1 + st.chill.pct;
       let combo = null;
       let statusSrc = null;
       if (src.kind === 'explosion') {
@@ -29,6 +30,9 @@ export const CombatMixin = {
       } else if (src.kind === 'snipe' && st.brk) {
         combo = 'weakspot';
         statusSrc = st.brk.src;
+      } else if (src.kind === 'chain' && st.slow && st.slow.pct >= 0.25) {
+        combo = 'superconduct';
+        statusSrc = st.slow.src;
       }
       if (combo) {
         dmg *= COMBOS[combo].mult;
@@ -80,7 +84,7 @@ export const CombatMixin = {
 
   // Le bouclier absorbe les dégâts en premier. Retourne les dégâts restants pour les PV.
   hitShield(e, dmg, src) {
-    const mult = src.kind === 'bullet' ? 1.5 : src.kind === 'explosion' ? 0.6 : 1;
+    const mult = src.kind === 'chain' ? 2 : src.kind === 'bullet' ? 1.5 : src.kind === 'explosion' ? 0.6 : 1;
     const eff = dmg * mult;
     e.shieldT = 0;
     if (eff < e.shield) {
@@ -159,6 +163,17 @@ export const CombatMixin = {
     else cur.t = Math.max(cur.t, t);
   },
 
+  applyStun(e, t, force = false) {
+    if (e.boss && !force) return;
+    const dur = e.boss ? Math.min(t, 0.4) : e.mini ? t * 0.5 : t;
+    if (!e.st.stun || e.st.stun.t < dur) e.st.stun = { t: dur };
+  },
+
+  applyChill(e, t, pct, src) {
+    const cur = e.st.chill;
+    if (!cur || cur.t < t) e.st.chill = { t, pct, src };
+  },
+
   applyBreak(e, t, src) {
     const cur = e.st.brk;
     if (!cur || cur.t < t) e.st.brk = { t, src };
@@ -186,6 +201,7 @@ export const CombatMixin = {
       if (e.dead) continue;
       if (opts.slow) this.applySlow(e, opts.slow.pct, opts.slow.t, src);
       if (opts.burn) this.applyBurn(e, dmg * opts.burn.dpsPct, opts.burn.t, src);
+      if (opts.stun) this.applyStun(e, opts.stun);
     }
     this.emit({ e: 'boom', x: Math.round(x), y: Math.round(y), r: Math.round(r), k: opts.k || 'mortar' });
     if (opts.napalm) {

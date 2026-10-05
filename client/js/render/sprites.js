@@ -362,6 +362,154 @@ const TURRETS = {
       ctx.stroke();
     }
   },
+  frost(ctx, k, L, b, def, now) {
+    const dark = shade(def.color, -0.5);
+    if (b === 'B') {
+      // aura polaire : flocon tournant
+      ctx.save();
+      ctx.rotate(now / 900);
+      ctx.strokeStyle = '#e6fbff';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 6; i++) {
+        ctx.rotate(TAU / 6);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(11 * k, 0);
+        ctx.moveTo(7 * k, 0);
+        ctx.lineTo(9.5 * k, -3 * k);
+        ctx.moveTo(7 * k, 0);
+        ctx.lineTo(9.5 * k, 3 * k);
+        ctx.stroke();
+      }
+      ctx.restore();
+      drawGlow(ctx, 0, 0, 14 * k, '#bff6ff', 0.7);
+      return;
+    }
+    const shards = L >= 4 ? [-3.2, 3.2] : [0];
+    for (const off of shards) {
+      ctx.fillStyle = '#dff9fb';
+      ctx.beginPath();
+      ctx.moveTo(4, off * k - 2.6 * k);
+      ctx.lineTo((b === 'C' ? 21 : 16) * k, off * k);
+      ctx.lineTo(4, off * k + 2.6 * k);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.fillStyle = def.color;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i * TAU) / 6;
+      const x = Math.cos(a) * 8.5 * k;
+      const y = Math.sin(a) * 8.5 * k;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = b === 'A' ? '#ff7675' : '#ffffff';
+    ctx.globalAlpha *= 0.85;
+    ctx.beginPath();
+    ctx.arc(0, 0, 3 * k, 0, TAU);
+    ctx.fill();
+    ctx.globalAlpha /= 0.85;
+  },
+  tesla(ctx, k, L, b, def, now) {
+    const dark = shade(def.color, -0.55);
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 2.5;
+    for (let i = 0; i < 2; i++) {
+      ctx.beginPath();
+      ctx.arc(0, 0, (10 - i * 3.5) * k, 0, TAU);
+      ctx.stroke();
+    }
+    const prongs = b === 'B' ? 1 : b === 'A' ? 4 : 3;
+    ctx.save();
+    ctx.rotate(now / 1200);
+    for (let i = 0; i < prongs; i++) {
+      ctx.rotate(TAU / prongs);
+      ctx.fillStyle = '#dcd6ff';
+      ctx.fillRect(7 * k, -1.5, 5 * k, 3);
+    }
+    ctx.restore();
+    const orb = b === 'C' ? '#ffd166' : '#c8b6ff';
+    drawGlow(ctx, 0, 0, 13 * k, orb, 0.75 + 0.25 * Math.sin(now / 90));
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, 0, 3.6 * k, 0, TAU);
+    ctx.fill();
+    if (Math.random() < 0.25) {
+      ctx.strokeStyle = 'rgba(220, 210, 255, 0.9)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const a = Math.random() * TAU;
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(a) * 6 * k + (Math.random() - 0.5) * 3, Math.sin(a) * 6 * k + (Math.random() - 0.5) * 3);
+      ctx.lineTo(Math.cos(a) * 11 * k, Math.sin(a) * 11 * k);
+      ctx.stroke();
+    }
+  },
+  railgun(ctx, k, L, b, def, now) {
+    const dark = shade(def.color, -0.55);
+    ctx.fillStyle = dark;
+    ctx.fillRect(-2, -5 * k, 27 * k, 2.6);
+    ctx.fillRect(-2, 5 * k - 2.6, 27 * k, 2.6);
+    ctx.globalAlpha *= 0.6 + 0.4 * Math.sin(now / 120);
+    ctx.fillStyle = '#9ad0ff';
+    ctx.fillRect(2, -1.2, 23 * k, 2.4);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = def.color;
+    rrect(ctx, -9 * k, -7 * k, 14 * k, 14 * k, 4);
+    ctx.fill();
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    drawGlow(ctx, -2 * k, 0, 7 * k, '#74b9ff', 0.8);
+  },
+  cryomortar(ctx, k, L, b, def) {
+    TURRETS.mortar(ctx, k, L, 'C', { color: '#7fb3d5' });
+    drawGlow(ctx, 3 * k, 0, 9 * k, '#d6f5ff', 0.55);
+  },
+  plasma(ctx, k, L, b, def, now) {
+    const n = 3;
+    for (let i = 0; i < n; i++) {
+      const off = (i - 1) * 3.4 * k;
+      ctx.fillStyle = '#4b2a63';
+      ctx.fillRect(3, off - 1.3 * k, 17 * k, 2.6 * k);
+      ctx.fillStyle = `rgba(230, 160, 255, ${0.5 + 0.4 * Math.sin(now / 70 + i)})`;
+      ctx.fillRect(5, off - 0.6, 14 * k, 1.2);
+    }
+    body(ctx, 8.5 * k, def.color, shade(def.color, -0.55));
+    drawGlow(ctx, 0, 0, 8 * k, '#f0b3ff', 0.6);
+  },
+  elemental(ctx, k, L, b, def, now) {
+    ctx.save();
+    ctx.rotate(now / 500);
+    ctx.fillStyle = '#ff7b39';
+    ctx.beginPath();
+    ctx.arc(0, 0, 10 * k, 0, Math.PI);
+    ctx.fill();
+    ctx.fillStyle = '#48dbfb';
+    ctx.beginPath();
+    ctx.arc(0, 0, 10 * k, Math.PI, TAU);
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = '#2d1b10';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 10 * k, 0, TAU);
+    ctx.stroke();
+    ctx.fillStyle = '#16100c';
+    ctx.beginPath();
+    ctx.arc(3 * k, 0, 4.5 * k, 0, TAU);
+    ctx.fill();
+    drawGlow(ctx, 3 * k, 0, 7 * k, '#ffffff', 0.35);
+  },
 };
 
 // Icône statique d'une tourelle (boutique, panneau).
@@ -431,6 +579,33 @@ export function drawEnemy(ctx, e, now, o = {}) {
     ctx.stroke();
     ctx.fillStyle = 'rgba(140, 210, 255, 0.18)';
     ctx.fill();
+  }
+  if (f & 512) {
+    ctx.strokeStyle = '#fff3a0';
+    ctx.lineWidth = 1.4;
+    for (let i = 0; i < 3; i++) {
+      const a = now / 150 + (i * TAU) / 3;
+      const x = Math.cos(a) * (r + 2);
+      const y = -r - 4 + Math.sin(a) * 3;
+      ctx.beginPath();
+      ctx.moveTo(x - 2, y - 2);
+      ctx.lineTo(x + 1, y);
+      ctx.lineTo(x - 1, y + 1);
+      ctx.lineTo(x + 2, y + 3);
+      ctx.stroke();
+    }
+  }
+  if (f & 1024) {
+    ctx.fillStyle = 'rgba(200, 245, 255, 0.85)';
+    for (let i = 0; i < 4; i++) {
+      const a = (i * TAU) / 4 + 0.4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9);
+      ctx.lineTo(Math.cos(a + 0.2) * (r + 4), Math.sin(a + 0.2) * (r + 4));
+      ctx.lineTo(Math.cos(a - 0.2) * (r + 4), Math.sin(a - 0.2) * (r + 4));
+      ctx.closePath();
+      ctx.fill();
+    }
   }
   if (f & 8) {
     ctx.save();

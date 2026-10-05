@@ -9,7 +9,8 @@ import { profile, SKINS, LEVEL_REWARDS, xpForLevel, titleFor } from './profile.j
 import { towerIcon, enemyIcon } from './render/sprites.js';
 import { DIFFICULTIES, MODES, PLAYER_COLORS, MAX_PLAYERS, FUSION_COUNT } from '../../shared/constants.js';
 import { MAPS } from '../../shared/data/maps.js';
-import { TOWER_LIST } from '../../shared/data/towers.js';
+import { TOWER_LIST, TOWER_TYPES } from '../../shared/data/towers.js';
+import { RECIPES, HYBRID_MIN_LEVEL } from '../../shared/data/recipes.js';
 import { ENEMY_TYPES } from '../../shared/data/enemies.js';
 import { SYNERGIES, ABILITIES, COMBOS, TEAM_ITEMS } from '../../shared/data/team.js';
 
@@ -725,6 +726,26 @@ export class App {
           'p',
           '• Les primes sont partagées selon les dégâts infligés. Donnez de l’or, payez les améliorations d’un allié, utilisez le trésor d’équipe.',
         ),
+      ),
+      h(
+        'div.panel',
+        h(
+          'h4',
+          `Fusions avancées — ${RECIPES.filter((r) => profile.data.discovered.includes(`recipe-${r.id}`)).length}/${RECIPES.length} découvertes`,
+        ),
+        h(
+          'p.muted',
+          `Deux tourelles de types différents, de même niveau (${HYBRID_MIN_LEVEL} minimum), peuvent donner une tourelle hybride. Expérimentez depuis le panneau d’une tourelle !`,
+        ),
+        RECIPES.map((r) => {
+          const known = profile.data.discovered.includes(`recipe-${r.id}`);
+          const ra = TOWER_TYPES[r.a].name + (r.aBranch ? ` (${TOWER_TYPES[r.a].branches[r.aBranch].name})` : '');
+          const rb = TOWER_TYPES[r.b].name;
+          const res = TOWER_TYPES[r.result];
+          if (known) return h('p', '⚗️ ', h('b', `${ra} + ${rb} → ${res.name}`), ' — ', res.desc);
+          if (r.secret) return h('p.muted', '⚗️ ??? + ??? → ??? (recette secrète)');
+          return h('p.muted', `⚗️ ${ra} + ??? → ???`);
+        }),
       ),
       h(
         'div.panel',

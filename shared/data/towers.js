@@ -245,10 +245,248 @@ export const TOWER_TYPES = {
       },
     },
   },
+
+  frost: {
+    id: 'frost',
+    name: 'Givre',
+    hotkey: '5',
+    role: 'Contrôle',
+    desc: 'Projette des éclats de glace qui ralentissent fortement. Prépare les combos (explosions, électricité).',
+    strengths: 'Ralentit tout, y compris les volants. Combos d’équipe.',
+    weaknesses: 'Dégâts faibles. Les boss résistent au ralentissement.',
+    cost: 90,
+    damage: 7,
+    rate: 1.25,
+    range: 110,
+    kind: 'frost',
+    ground: true,
+    air: true,
+    slow: { pct: 0.3, t: 2 },
+    color: '#81ecec',
+    accent: '#2c8c99',
+    traits: {
+      2: {
+        name: 'Gel profond',
+        desc: 'Ralentissement porté à 40 %.',
+        apply: (s) => (s.slow = { ...s.slow, pct: Math.max(s.slow.pct, 0.4) }),
+      },
+      4: {
+        name: 'Blizzard',
+        desc: 'Chaque éclat explose en une petite zone glacée (40 px) qui ralentit aussi les ennemis voisins.',
+        apply: (s) => (s.splash = Math.max(s.splash, 40)),
+      },
+      5: {
+        name: 'Zéro absolu',
+        desc: 'Toutes les 6 s, gèle sur place tous les ennemis à portée (1,2 s ; boss 0,4 s).',
+        apply: (s) => (s.ultimate = 'absolute'),
+      },
+    },
+    branches: {
+      A: {
+        name: 'Glace brisante',
+        desc: 'Les cibles deviennent fragiles 3 s : elles subissent +15 % de dégâts de toutes les sources.',
+        apply: (s) => (s.chill = { t: 3, pct: 0.15 }),
+      },
+      B: {
+        name: 'Aura polaire',
+        desc: 'Ne tire plus : ralentit en permanence tous les ennemis à portée et les blesse lentement.',
+        apply: (s) => {
+          s.aura = true;
+          s.damage *= 1.4;
+        },
+      },
+      C: {
+        name: 'Éclats perforants',
+        desc: 'Les éclats traversent 3 ennemis et font 50 % de dégâts en plus.',
+        apply: (s) => {
+          s.pierce = 3;
+          s.pierceFalloff = 0.85;
+          s.damage *= 1.5;
+        },
+      },
+    },
+  },
+
+  tesla: {
+    id: 'tesla',
+    name: 'Tesla',
+    hotkey: '6',
+    role: 'Chaîne',
+    desc: 'Un arc électrique qui rebondit entre les ennemis proches. Excellent contre les groupes et les boucliers.',
+    strengths: 'Groupes, boucliers (×2), volants.',
+    weaknesses: 'Portée courte, dégâts dispersés sur les cibles isolées.',
+    cost: 100,
+    damage: 16,
+    rate: 0.8,
+    range: 115,
+    kind: 'chain',
+    ground: true,
+    air: true,
+    chains: 3,
+    chainRange: 75,
+    chainFalloff: 0.8,
+    color: '#a29bfe',
+    accent: '#5f4fd1',
+    traits: {
+      2: { name: 'Arc étendu', desc: 'L’arc rebondit sur une cible de plus.', apply: (s) => (s.chains += 1) },
+      4: { name: 'Surtension', desc: 'Chaque cible touchée est paralysée 0,25 s.', apply: (s) => (s.stun = Math.max(s.stun, 0.25)) },
+      5: {
+        name: 'Tempête électrique',
+        desc: 'Un tir sur 5 rebondit sur 12 cibles sans perte de puissance.',
+        apply: (s) => (s.ultimate = 'thunder'),
+      },
+    },
+    branches: {
+      A: {
+        name: 'Arc de foudre',
+        desc: '+3 rebonds, dégâts ×0,85.',
+        apply: (s) => {
+          s.chains += 3;
+          s.damage *= 0.85;
+        },
+      },
+      B: {
+        name: 'Condensateur',
+        desc: 'Ne rebondit plus mais frappe une seule cible : dégâts ×2,6, cadence ×0,75.',
+        apply: (s) => {
+          s.chains = 0;
+          s.damage *= 2.6;
+          s.rate *= 0.75;
+        },
+      },
+      C: {
+        name: 'Paralysie',
+        desc: 'Paralyse chaque cible 0,5 s (hors boss). Dégâts ×0,8.',
+        apply: (s) => {
+          s.stun = Math.max(s.stun, 0.5);
+          s.damage *= 0.8;
+        },
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // Tourelles hybrides : uniquement par fusion avancée (voir data/recipes.js).
+  // Elles naissent au niveau de leurs ingrédients (3 minimum) et peuvent ensuite
+  // fusionner entre elles (3 identiques -> niveau +1). Pas de spécialisation.
+  railgun: {
+    id: 'railgun',
+    name: 'Railgun',
+    hybrid: true,
+    role: 'Hybride',
+    desc: 'Sniper + Tesla. Un rayon magnétique qui traverse toute la ligne, détecte les furtifs et paralyse brièvement.',
+    strengths: 'Lignes d’ennemis, boss, furtifs.',
+    weaknesses: 'Cadence très lente.',
+    cost: 210,
+    damage: 190,
+    rate: 0.33,
+    range: 330,
+    kind: 'snipe',
+    ground: true,
+    air: true,
+    armorPierce: 12,
+    detect: true,
+    pierceAll: true,
+    stun: 0.3,
+    defaultTarget: 'strongest',
+    color: '#74b9ff',
+    accent: '#0652dd',
+    traits: {
+      4: { name: 'Surcharge magnétique', desc: '25 % de coups critiques ×2.', apply: (s) => (s.crit = Math.max(s.crit, 0.25)) },
+      5: { name: 'Tir chargé', desc: 'Un tir sur 4 inflige ×3 dégâts.', apply: (s) => (s.ultimate = 'charged') },
+    },
+    branches: {},
+  },
+  cryomortar: {
+    id: 'cryomortar',
+    name: 'Cryo-mortier',
+    hybrid: true,
+    role: 'Hybride',
+    desc: 'Mortier + Givre. Des obus glacés qui gèlent la zone d’impact. Prépare d’énormes combos d’explosions.',
+    strengths: 'Groupes, contrôle de foule.',
+    weaknesses: 'Ne touche pas les volants.',
+    cost: 210,
+    damage: 55,
+    rate: 0.5,
+    range: 175,
+    minRange: 45,
+    kind: 'mortar',
+    ground: true,
+    air: false,
+    splash: 72,
+    flightTime: 0.9,
+    slow: { pct: 0.5, t: 2.5 },
+    stun: 0.6,
+    color: '#a5d8ff',
+    accent: '#3d7bd9',
+    traits: {
+      4: { name: 'Double salve', desc: 'Tire deux obus par salve.', apply: (s) => (s.multi = 2) },
+      5: { name: 'Hiver éternel', desc: 'Une salve sur 3 déclenche 4 obus supplémentaires.', apply: (s) => (s.ultimate = 'carpet') },
+    },
+    branches: {},
+  },
+  plasma: {
+    id: 'plasma',
+    name: 'Gatling à plasma',
+    hybrid: true,
+    role: 'Hybride',
+    desc: 'Mitrailleuse + Tesla. Des balles de plasma qui ignorent presque toute l’armure et rebondissent sur une cible voisine.',
+    strengths: 'Essaims, blindés, boucliers.',
+    weaknesses: 'Portée moyenne.',
+    cost: 170,
+    damage: 7,
+    rate: 8,
+    range: 115,
+    kind: 'bullet',
+    ground: true,
+    air: true,
+    airMult: 1.3,
+    armorPierce: 10,
+    chains: 1,
+    chainRange: 70,
+    chainFalloff: 0.7,
+    color: '#d980fa',
+    accent: '#8e44ad',
+    traits: {
+      4: { name: 'Plasma instable', desc: 'Rebondit sur 2 cibles.', apply: (s) => (s.chains = Math.max(s.chains, 2)) },
+      5: { name: 'Tempête de plasma', desc: 'Toutes les 8 s : rafale de 2,5 s à cadence ×3.', apply: (s) => (s.ultimate = 'storm') },
+    },
+    branches: {},
+  },
+  elemental: {
+    id: 'elemental',
+    name: 'Élémentaire',
+    hybrid: true,
+    role: 'Hybride secret',
+    desc: 'Mortier Napalm + Givre. Le feu et la glace à la fois : brûle, ralentit et déclenche des combos en chaîne.',
+    strengths: 'Tout ce qui marche au sol.',
+    weaknesses: 'Ne touche pas les volants.',
+    cost: 210,
+    damage: 60,
+    rate: 0.55,
+    range: 180,
+    minRange: 40,
+    kind: 'mortar',
+    ground: true,
+    air: false,
+    splash: 70,
+    flightTime: 0.8,
+    slow: { pct: 0.4, t: 2.5 },
+    burn: { t: 3, dpsPct: 0.4 },
+    color: '#ff9f43',
+    accent: '#48dbfb',
+    traits: {
+      4: { name: 'Choc thermique', desc: 'Dégâts +30 %.', apply: (s) => (s.damage *= 1.3) },
+      5: { name: 'Cataclysme', desc: 'Une salve sur 3 déclenche 4 obus supplémentaires.', apply: (s) => (s.ultimate = 'carpet') },
+    },
+    branches: {},
+  },
 };
 
-export const TOWER_LIST = Object.values(TOWER_TYPES);
-export const TOWER_IDS = Object.keys(TOWER_TYPES);
+// Tourelles achetables (boutique) ; les hybrides ne s'obtiennent que par fusion.
+export const TOWER_LIST = Object.values(TOWER_TYPES).filter((d) => !d.hybrid);
+export const TOWER_IDS = TOWER_LIST.map((d) => d.id);
+export const HYBRID_LIST = Object.values(TOWER_TYPES).filter((d) => d.hybrid);
 
 // Valeur « théorique » d'une tourelle : base des coûts d'amélioration.
 export function towerValue(type, level) {

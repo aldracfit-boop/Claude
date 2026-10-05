@@ -1,5 +1,7 @@
 // Ressource commune (Trésor d'équipe), synergies de composition, capacités et combos.
 
+import { RECIPES } from './recipes.js';
+
 export const TEAM_ITEMS = {
   repair: {
     id: 'repair',
@@ -70,6 +72,22 @@ export function synergyWeight(level) {
   return Math.pow(3, level - 1);
 }
 export const FRATERNITY_NEED = 6;
+export const ARSENAL_NEED = 5;
+
+// Puissance par type (équivalents niveau 1) à partir d'une liste de tourelles { type, level }.
+// Une tourelle hybride compte pour ses deux ingrédients.
+export function synergyPower(list) {
+  const power = { canon: 0, mg: 0, sniper: 0, mortar: 0, frost: 0, tesla: 0 };
+  for (const t of list) {
+    const w = synergyWeight(t.level);
+    const rec = HYBRID_SOURCES[t.type];
+    if (rec) for (const k of rec) power[k] += w;
+    else power[t.type] = (power[t.type] || 0) + w;
+  }
+  return power;
+}
+
+const HYBRID_SOURCES = Object.fromEntries(RECIPES.map((r) => [r.result, [r.a, r.b]]));
 
 export const SYNERGIES = [
   {
@@ -161,11 +179,57 @@ export const SYNERGIES = [
     },
   },
   {
+    id: 'permafrost',
+    name: 'Permafrost',
+    icon: '❄️',
+    type: 'frost',
+    need: 6,
+    desc: 'Givre : ralentissement +10 %.',
+    apply: (s, t) => {
+      if (t.type === 'frost' && s.slow) s.slow = { ...s.slow, pct: Math.min(0.7, s.slow.pct + 0.1) };
+    },
+  },
+  {
+    id: 'iceage',
+    name: 'Ère glaciaire',
+    icon: '❄️',
+    type: 'frost',
+    need: 20,
+    desc: 'Givre : dégâts +25 % et ralentissement plus long.',
+    apply: (s, t) => {
+      if (t.type !== 'frost') return;
+      s.damage *= 1.25;
+      if (s.slow) s.slow = { ...s.slow, t: s.slow.t * 1.5 };
+    },
+  },
+  {
+    id: 'hightension',
+    name: 'Haute tension',
+    icon: '⚡',
+    type: 'tesla',
+    need: 6,
+    desc: 'Tesla : +1 rebond.',
+    apply: (s, t) => {
+      if (t.type === 'tesla' && s.chains > 0) s.chains += 1;
+    },
+  },
+  {
+    id: 'grid',
+    name: 'Réseau électrique',
+    icon: '⚡',
+    type: 'tesla',
+    need: 20,
+    desc: 'Tesla : +25 % de dégâts.',
+    apply: (s, t) => {
+      if (t.type === 'tesla') s.damage *= 1.25;
+    },
+  },
+  {
     id: 'arsenal',
     name: 'Arsenal complet',
     icon: '🧰',
     special: 'arsenal',
-    desc: 'Au moins une tourelle de chaque type : +8 % de dégâts pour toutes les tourelles.',
+    desc: 'Au moins 5 types de tourelles différents dans l’équipe : +8 % de dégâts pour toutes les tourelles.',
     apply: (s) => {
       s.damage *= 1.08;
     },
@@ -220,6 +284,7 @@ export const COMBOS = {
   shatter: { id: 'shatter', name: 'Brisure glaciale', mult: 1.4, desc: 'Explosion sur une cible ralentie : +40 %.' },
   ignite: { id: 'ignite', name: 'Embrasement', mult: 1.3, desc: 'Explosion sur une cible en feu : +30 %.' },
   weakspot: { id: 'weakspot', name: 'Point faible', mult: 2, desc: 'Sniper sur une armure brisée : dégâts ×2.' },
+  superconduct: { id: 'superconduct', name: 'Supraconduction', mult: 1.5, desc: 'Arc électrique sur une cible ralentie (glace) : +50 %.' },
 };
 export const COOP_COMBO_MULT = 1.15;
 

@@ -4,6 +4,8 @@
 
 import { FUSION_COUNT, FUSION_UPGRADE_REFUND, FUSION_REQUEST_TIMEOUT, MAX_LEVEL, MAX_RARITY } from '../constants.js';
 import { canFuseTogether } from './stats.js';
+import { TOWER_TYPES } from '../data/towers.js';
+import { findRecipe } from '../data/recipes.js';
 
 export const FusionMixin = {
   // Tourelles compatibles avec `t` (hors `t`), triées par distance.
@@ -51,9 +53,23 @@ export const FusionMixin = {
     return { ok: true, t, partners, consent };
   },
 
+  // Fusion avancée : deux tourelles de types différents -> tourelle hybride.
+  validateHybrid(pid, primaryId, partnerId) {
+    const t = this.towerById.get(primaryId);
+    const u = this.towerById.get(partnerId);
+    if (!t || !u || t === u) return { ok: false, msg: 'Tourelle introuvable.' };
+    if (!t.owners.includes(pid)) return { ok: false, msg: 'Cette tourelle ne vous appartient pas.' };
+    const recipe = findRecipe(t, u);
+    if (!recipe) return { ok: false, msg: 'Aucune recette ne combine ces deux tourelles (même niveau, 3 minimum).' };
+    const consent = new Set();
+    for (const tw of [t, u]) for (const o of tw.owners) if (o !== pid) consent.add(o);
+    return { ok: true, t, partners: [u], recipe, consent };
+  },
+
   cmdFuse(pid, c) {
     const t = this.towerById.get(c.id | 0);
     if (!t) return this.error(pid, 'Tourelle introuvable.');
+    if (c.hybrid != null) return this.cmdHybrid(pid, t, c.hybrid | 0);
     const useCore = !!c.core;
     let partnerIds = Array.isArray(c.partners) ? c.partners.map((x) => x | 0) : null;
     if (!partnerIds) {
@@ -90,6 +106,100 @@ export const FusionMixin = {
     this.emit({ e: 'fuseReq', id: req.id, from: pid, to: req.need, tt: t.type, l: t.level });
   },
 
+  cmdHybrid(pid, t, partnerId) {
+    const v = this.validateHybrid(pid, t.id, partnerId);
+    if (!v.ok) return this.error(pid, v.msg);
+    for (const r of this.fusionRequests) {
+      if ([r.primary, ...r.partners].some((id) => id === t.id || id === partnerId)) {
+        return this.error(pid, 'Une demande de fusion est déjà en cours pour ces tourelles.');
+      }
+    }
+    if (v.consent.size === 0) {
+      this.doHybrid(pid, v.t, v.partners[0], v.recipe);
+      return;
+    }
+    const req = {
+      id: this.nextId++,
+      from: pid,
+      primary: t.id,
+      partners: [partnerId],
+      core: false,
+      hybrid: v.recipe.id,
+      need: [...v.consent],
+      acc: [],
+      t: FUSION_REQUEST_TIMEOUT,
+      type: t.type,
+      level: t.level,
+    };
+    this.fusionRequests.push(req);
+    this.emit({ e: 'fuseReq', id: req.id, from: pid, to: req.need, tt: t.type, l: t.level, hy: 1 });
+  },
+
+  doHybrid(pid, t, u, recipe) {
+    const all = [t, u];
+    let refundTotal = 0;
+    for (const tw of all) {
+      for (const k in tw.upSpend) {
+        const amt = tw.upSpend[k];
+        const pl = this.players[k];
+        if (pl) pl.gold += amt * FUSION_UPGRADE_REFUND;
+        tw.invested[k] = (tw.invested[k] || 0) - amt;
+        refundTotal += amt * FUSION_UPGRADE_REFUND;
+      }
+      tw.upSpend = {};
+    }
+    const owners = [t.owner];
+    const invested = {};
+    for (const tw of all) {
+      for (const o of tw.owners) if (!owners.includes(o)) owners.push(o);
+      for (const k in tw.invested) invested[k] = (invested[k] || 0) + Math.max(0, tw.invested[k]);
+    }
+    let rarity = Math.max(t.rarity, u.rarity);
+    let promoted = false;
+    if (rarity < MAX_RARITY && this.rng.next() < 0.2) {
+      rarity++;
+      promoted = true;
+    }
+    const from = [[Math.round(u.x), Math.round(u.y)]];
+    this.removeTower(u);
+    const def = TOWER_TYPES[recipe.result];
+    t.type = recipe.result;
+    t.branch = null;
+    t.rarity = rarity;
+    t.owners = owners;
+    t.invested = invested;
+    t.up = { dmg: 0, rate: 0, range: 0 };
+    t.cd = 0.4;
+    t.shots = 0;
+    if (def.defaultTarget) t.targetMode = def.defaultTarget;
+    const coop = owners.length > 1;
+    for (const o of owners) {
+      const pl = this.players[o];
+      if (!pl) continue;
+      pl.stats.fusions++;
+      pl.stats.hybrids = (pl.stats.hybrids || 0) + 1;
+      if (coop) pl.stats.coopFusions++;
+    }
+    this.towersDirty = true;
+    this.emit({
+      e: 'fusion',
+      id: t.id,
+      p: pid,
+      x: Math.round(t.x),
+      y: Math.round(t.y),
+      from,
+      tt: t.type,
+      l: t.level,
+      r: rarity,
+      promo: promoted ? 1 : 0,
+      coop: coop ? 1 : 0,
+      core: 0,
+      hy: recipe.id,
+      refund: Math.round(refundTotal),
+      own: owners,
+    });
+  },
+
   cmdFuseReply(pid, c) {
     const req = this.fusionRequests.find((r) => r.id === (c.id | 0));
     if (!req) return this.error(pid, 'Cette demande de fusion n’existe plus.');
@@ -102,6 +212,16 @@ export const FusionMixin = {
     req.acc.push(pid);
     if (req.acc.length < req.need.length) return;
     this.fusionRequests.splice(this.fusionRequests.indexOf(req), 1);
+    if (req.hybrid) {
+      const hv = this.validateHybrid(req.from, req.primary, req.partners[0]);
+      if (!hv.ok) {
+        this.emit({ e: 'fuseRes', id: req.id, ok: 0, from: req.from, msg: hv.msg });
+        return;
+      }
+      this.emit({ e: 'fuseRes', id: req.id, ok: 1, from: req.from });
+      this.doHybrid(req.from, hv.t, hv.partners[0], hv.recipe);
+      return;
+    }
     const v = this.validateFusion(req.from, req.primary, req.partners, req.core);
     if (!v.ok) {
       this.emit({ e: 'fuseRes', id: req.id, ok: 0, from: req.from, msg: v.msg });

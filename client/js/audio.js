@@ -211,6 +211,8 @@ class AudioEngine {
 }
 
 const THROTTLE = {
+  frost: 0.07,
+  zap: 0.07,
   bullet: 0.045,
   shell: 0.05,
   snipe: 0.06,
@@ -259,6 +261,14 @@ const SFX = {
     a.osc('sawtooth', 1200, t, 0.2, 0.05, { to: 150 });
   },
   mortar: (a, t) => a.osc('sine', 110, t, 0.28, 0.16, { to: 45 }),
+  frost: (a, t) => {
+    a.osc('sine', 1800, t, 0.12, 0.04, { to: 2600 });
+    a.noiseBurst(t, 0.08, 0.03, { type: 'highpass', freq: 6000 });
+  },
+  zap: (a, t) => {
+    a.noiseBurst(t, 0.12, 0.07, { type: 'bandpass', freq: 3500, q: 4 });
+    a.osc('sawtooth', 220, t, 0.1, 0.04, { to: 880, curve: 'lin' });
+  },
   base: (a, t) => {
     a.osc('square', 260, t, 0.12, 0.05, { to: 90 });
     a.noiseBurst(t, 0.08, 0.06, { freq: 2000 });

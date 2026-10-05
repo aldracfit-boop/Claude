@@ -105,6 +105,17 @@ export const TowerMixin = {
       const s = t.stats;
       let oc = false;
       for (const o of t.owners) if (this.players[o] && this.players[o].overchargeT > 0) oc = true;
+      if (s.aura) {
+        this.updateAura(t, s, dt, oc ? 1.5 : 1);
+        continue;
+      }
+      if (s.ultimate === 'absolute') {
+        t.burstCd -= dt;
+        if (t.burstCd <= 0) {
+          t.burstCd = 6;
+          this.absoluteZero(t, s);
+        }
+      }
       let rateMul = oc ? 1.25 : 1;
       if (s.ultimate === 'storm') {
         if (t.burstT > 0) {
@@ -202,6 +213,11 @@ export const TowerMixin = {
         } else {
           this.bulletHit(target, dmg, s, t);
         }
+        if (s.chains > 0) {
+          const pts = this.chainHit(t, s, target, dmg * s.chainFalloff, s.chains, s.chainFalloff, true);
+          if (pts.length > 1)
+            this.emit({ e: 'shot', k: 'chain', tw: 0, x1: pts[0][0], y1: pts[0][1], x2: pts[0][0], y2: pts[0][1], pts, l: 1, m: 1 });
+        }
         this.emit({
           e: 'shot',
           k: 'bullet',
@@ -252,6 +268,58 @@ export const TowerMixin = {
         this.emit({ e: 'hit', x: r0(target.x), y: r0(target.y), v: r0(dmg), c: crit || charged ? 1 : 0 });
         break;
       }
+      case 'frost': {
+        const crit = this.rollCrit(s);
+        const dmg = base * (crit ? s.critMult : 1);
+        const hits = s.pierce > 1 ? this.lineTargets(t.x, t.y, t.angle, s.range, 10, s, s.pierce) : [target];
+        if (!hits.length) hits.push(target);
+        let f = 1;
+        let end = target;
+        for (const e of hits) {
+          this.frostHit(e, dmg * f, s, t);
+          end = e;
+          f *= s.pierceFalloff;
+        }
+        if (s.splash) {
+          for (const e of this.enemies) {
+            if (e.dead || hits.includes(e) || !this.canTarget(s, e)) continue;
+            const reach = s.splash + e.radius;
+            if ((e.x - end.x) ** 2 + (e.y - end.y) ** 2 <= reach * reach) this.frostHit(e, dmg * 0.4, s, t);
+          }
+        }
+        this.emit({
+          e: 'shot',
+          k: 'frost',
+          tw: t.id,
+          x1: r0(t.x),
+          y1: r0(t.y),
+          x2: r0(end.x),
+          y2: r0(end.y),
+          l: t.level,
+          sp: s.splash ? 1 : 0,
+        });
+        break;
+      }
+      case 'chain': {
+        const thunder = s.ultimate === 'thunder' && t.shots % 5 === 0;
+        const crit = this.rollCrit(s);
+        const dmg = base * (crit ? s.critMult : 1);
+        const pts = this.chainHit(t, s, target, dmg, thunder ? 12 : s.chains, thunder ? 1 : s.chainFalloff);
+        this.emit({
+          e: 'shot',
+          k: 'chain',
+          tw: t.id,
+          x1: r0(t.x),
+          y1: r0(t.y),
+          x2: r0(target.x),
+          y2: r0(target.y),
+          pts,
+          l: t.level,
+          c: thunder ? 1 : 0,
+        });
+        if (crit || thunder) this.emit({ e: 'hit', x: r0(target.x), y: r0(target.y), v: r0(dmg), c: 1 });
+        break;
+      }
       case 'mortar': {
         const targets = s.multi > 1 ? this.findTargets(t, s, target, s.multi) : [target];
         for (let i = 0; i < targets.length; i++) {
@@ -288,6 +356,7 @@ export const TowerMixin = {
       burn: s.burn,
       napalm: s.napalm,
       frags: s.frags,
+      stun: s.stun,
     });
     this.emit({
       e: 'shot',
@@ -315,12 +384,85 @@ export const TowerMixin = {
     }
     this.damageEnemy(e, dmg, t.src);
     if (!e.dead) {
+      if (s.stun) this.applyStun(e, s.stun);
       if (s.mark) this.applyMark(e, s.mark.t, t.src);
       if (s.execute && !e.boss && !e.mini && e.hp / e.maxHp < s.execute) {
         this.damageEnemy(e, e.hp + 1e6, { ...t.src, armorPierce: 1e6 });
         this.emit({ e: 'exec', x: r0(e.x), y: r0(e.y) });
       }
     }
+  },
+
+  frostHit(e, dmg, s, t) {
+    this.damageEnemy(e, dmg, t.src);
+    if (e.dead) return;
+    if (s.slow) this.applySlow(e, s.slow.pct, s.slow.t, t.src);
+    if (s.chill) this.applyChill(e, s.chill.t, s.chill.pct, t.src);
+  },
+
+  // Arc électrique : touche la cible puis rebondit vers les ennemis les plus proches.
+  // Retourne la liste des points de l'arc (pour l'affichage). `skipFirst` : la cible a déjà été touchée.
+  chainHit(t, s, target, dmg, chains, falloff, skipFirst = false) {
+    const pts = [[r0(target.x), r0(target.y)]];
+    const hit = [target];
+    if (!skipFirst) this.chainDamage(target, dmg, s, t);
+    let cur = target;
+    let d = skipFirst ? dmg : dmg * falloff;
+    const r2 = s.chainRange * s.chainRange;
+    for (let k = 0; k < chains; k++) {
+      let best = null;
+      let bestD = r2;
+      for (const e of this.enemies) {
+        if (e.dead || hit.includes(e) || !this.canTarget(s, e)) continue;
+        const dd = (e.x - cur.x) ** 2 + (e.y - cur.y) ** 2;
+        if (dd < bestD) {
+          bestD = dd;
+          best = e;
+        }
+      }
+      if (!best) break;
+      hit.push(best);
+      pts.push([r0(best.x), r0(best.y)]);
+      this.chainDamage(best, d, s, t);
+      cur = best;
+      d *= falloff;
+    }
+    return pts;
+  },
+
+  chainDamage(e, dmg, s, t) {
+    this.damageEnemy(e, dmg, t.srcChain || t.src);
+    if (!e.dead && s.stun) this.applyStun(e, s.stun);
+  },
+
+  updateAura(t, s, dt, dmgMul) {
+    t.auraT = (t.auraT || 0) - dt;
+    if (t.auraT > 0) return;
+    t.auraT = 0.25;
+    const r = s.range * this.rangeMult;
+    let any = false;
+    for (const e of this.enemies) {
+      if (e.dead || !this.canTarget(s, e)) continue;
+      if ((e.x - t.x) ** 2 + (e.y - t.y) ** 2 > (r + e.radius * 0.5) ** 2) continue;
+      any = true;
+      this.damageEnemy(e, s.damage * s.rate * 0.25 * 0.7 * dmgMul, t.src);
+      if (!e.dead && s.slow) this.applySlow(e, Math.max(0.35, s.slow.pct), 0.5, t.src);
+      if (!e.dead && s.chill) this.applyChill(e, 0.5, s.chill.pct, t.src);
+    }
+    if (any && (t.auraFx = (t.auraFx || 0) + 1) % 4 === 0) this.emit({ e: 'aura', id: t.id });
+  },
+
+  absoluteZero(t, s) {
+    const r = s.range * this.rangeMult;
+    let n = 0;
+    for (const e of this.enemies) {
+      if (e.dead || !this.canTarget(s, e)) continue;
+      if ((e.x - t.x) ** 2 + (e.y - t.y) ** 2 > r * r) continue;
+      this.applyStun(e, e.boss || e.mini ? 0.4 : 1.2, true);
+      this.applySlow(e, 0.5, 2, t.src);
+      n++;
+    }
+    if (n) this.emit({ e: 'freezeZone', x: r0(t.x), y: r0(t.y), r: r0(r) });
   },
 
   // Ennemis alignés sur un segment (tirs perforants).
@@ -375,6 +517,7 @@ export const TowerMixin = {
             slow: p.slow,
             burn: p.burn,
             napalm: p.napalm,
+            stun: p.stun,
             frags: p.frag ? 0 : p.frags,
             k: p.frag ? 'frag' : 'mortar',
           });

@@ -6,7 +6,7 @@ import { profile } from './profile.js';
 const STEPS = [
   {
     title: 'Placez votre première tourelle',
-    text: 'Choisissez une tourelle dans la boutique à droite (ou touches 1 à 4), puis cliquez sur une case libre près du chemin. Le Canon est un bon début !',
+    text: 'Choisissez une tourelle dans la boutique à droite (ou touches 1 à 6), puis cliquez sur une case libre près du chemin. Le Canon est un bon début !',
     done: (ev, me) => ev.e === 'place' && ev.p === me,
   },
   {

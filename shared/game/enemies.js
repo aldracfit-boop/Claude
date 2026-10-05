@@ -51,7 +51,7 @@ export const EnemyMixin = {
         (def.boss || def.miniboss ? 1 : countMult(w)),
       damage: def.damagePct ? def.damagePct * this.base.maxHp : def.damage,
       radius: def.radius,
-      st: { slow: null, burn: null, brk: null, mark: null },
+      st: { slow: null, burn: null, brk: null, mark: null, stun: null, chill: null },
       dmgBy: new Array(this.players.length).fill(0),
       hitT: new Array(this.players.length).fill(-99),
       assault: false,
@@ -115,6 +115,7 @@ export const EnemyMixin = {
       if (st.slow && (st.slow.t -= dt) <= 0) st.slow = null;
       if (st.brk && (st.brk.t -= dt) <= 0) st.brk = null;
       if (st.mark && (st.mark.t -= dt) <= 0) st.mark = null;
+      if (st.chill && (st.chill.t -= dt) <= 0) st.chill = null;
       if (st.burn) {
         const b = st.burn;
         this.damageEnemy(e, b.dps * dt, b.src);
@@ -147,6 +148,10 @@ export const EnemyMixin = {
         e.chargeT -= dt;
       }
       if (e.rush) spd *= e.def.special.mult;
+      if (st.stun) {
+        spd = 0;
+        if ((st.stun.t -= dt) <= 0) st.stun = null;
+      }
       if (e.boss) {
         const ph = e.def.phases[e.phase - 1];
         if (ph.speedMult) spd *= ph.speedMult;

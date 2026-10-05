@@ -9,15 +9,19 @@ import { ENEMY_IDS } from '../data/enemies.js';
 import { TEAM_ITEMS, ABILITIES } from '../data/team.js';
 import { MERCHANT_DEALS } from '../data/events.js';
 import { RNG } from '../util.js';
+import { findRecipe } from '../data/recipes.js';
 import { upgradeCost, upgradeSlots, upgradesUsed } from './stats.js';
 
+const DEFAULT_BRANCHES = { canon: 'B', mg: 'C', sniper: 'A', mortar: 'C', frost: 'A', tesla: 'A' };
 export const BOT_STYLES = {
-  artillery: { name: 'Artilleur', focus: ['mortar', 'canon'], branches: { mortar: 'C', canon: 'B', mg: 'C', sniper: 'A' } },
-  marksman: { name: 'Tireur', focus: ['sniper', 'mg'], branches: { sniper: 'A', mg: 'C', canon: 'A', mortar: 'A' } },
-  balanced: { name: 'Polyvalent', focus: ['canon', 'sniper'], branches: { canon: 'B', sniper: 'C', mg: 'A', mortar: 'B' } },
-  swarm: { name: 'Nettoyeur', focus: ['mg', 'mortar'], branches: { mg: 'A', mortar: 'A', canon: 'C', sniper: 'B' } },
+  artillery: { name: 'Artilleur', focus: ['mortar', 'canon'], branches: { mortar: 'C', canon: 'B' } },
+  marksman: { name: 'Tireur', focus: ['sniper', 'mg'], branches: { sniper: 'A', mg: 'C' } },
+  cryo: { name: 'Cryomancien', focus: ['frost', 'mortar'], branches: { frost: 'A', mortar: 'A' } },
+  storm: { name: 'Électricien', focus: ['tesla', 'sniper'], branches: { tesla: 'A', sniper: 'C' } },
+  balanced: { name: 'Polyvalent', focus: ['canon', 'sniper'], branches: { canon: 'B', sniper: 'C' } },
+  swarm: { name: 'Nettoyeur', focus: ['mg', 'tesla'], branches: { mg: 'A', tesla: 'C' } },
 };
-const STYLE_ORDER = ['artillery', 'marksman', 'balanced', 'swarm'];
+const STYLE_ORDER = ['artillery', 'marksman', 'cryo', 'storm', 'balanced', 'swarm'];
 
 export class BotBrain {
   constructor(game, pid, opts = {}) {
@@ -185,7 +189,8 @@ export class BotBrain {
     // 2. Spécialisations.
     for (const t of this.myTowers()) {
       if (t.level >= BRANCH_LEVEL && !t.branch) {
-        this.cmd({ a: 'branch', id: t.id, b: this.style.branches[t.type] || 'A' });
+        if (TOWER_TYPES[t.type].hybrid) continue;
+        this.cmd({ a: 'branch', id: t.id, b: this.style.branches[t.type] || DEFAULT_BRANCHES[t.type] || 'A' });
       }
     }
 
@@ -220,7 +225,19 @@ export class BotBrain {
   tryFusions() {
     const g = this.g;
     const me = this.me;
-    const groups = groupTowers(this.myTowers());
+    const mine = this.myTowers();
+    // Fusion avancée de temps en temps quand deux ingrédients de niveau 3+ sont disponibles.
+    if (this.rng.next() < 0.25) {
+      for (const t of mine) {
+        if (t.level < 3 || TOWER_TYPES[t.type].hybrid) continue;
+        const u = mine.find((x) => x !== t && findRecipe(t, x));
+        if (u) {
+          this.cmd({ a: 'fuse', id: t.id, hybrid: u.id });
+          return true;
+        }
+      }
+    }
+    const groups = groupTowers(mine);
     for (const [key, arr] of groups) {
       const level = +key.split('|')[1];
       if (level >= MAX_LEVEL) continue;

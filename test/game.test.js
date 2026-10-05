@@ -506,3 +506,125 @@ test('partie complète jouée par des IA sans erreur', () => {
   assert.equal(g.phase, PHASE.VICTORY);
   assert.ok(g.players.every((p) => p.stats.fusions > 0));
 });
+
+// ------------------------------------------------------------ Phase 2 : Givre, Tesla, hybrides
+function startWave(g) {
+  run(g, [[0, { a: 'ready', v: true }], [1, { a: 'ready', v: true }]]);
+  g.waveState.qi = g.waveState.queue.length;
+  for (const e of g.enemies) e.dead = true;
+  g.cleanupEnemies();
+}
+
+function towerAt(g, pid, type, level, branch = null) {
+  const [tl] = freeTiles(g, 1);
+  g.players[pid].gold = Math.max(g.players[pid].gold, 10000);
+  const t = place(g, pid, type, tl);
+  t.level = level;
+  t.branch = branch;
+  g.towersDirty = true;
+  g.step(DT);
+  return t;
+}
+
+test('Givre ralentit, Tesla rebondit, Supraconduction sur cible ralentie', () => {
+  const g = newGame();
+  startWave(g);
+  const a = g.spawnEnemy('runner', { dist: 200 });
+  const b = g.spawnEnemy('runner', { dist: 230 });
+  const tesla = towerAt(g, 0, 'tesla', 1);
+  tesla.x = a.x;
+  tesla.y = a.y - 30;
+  g.towersDirty = true;
+  g.step(DT);
+  g.drainEvents();
+  g.applySlow(a, 0.3, 2, { owners: [1] });
+  const pts = g.chainHit(tesla, tesla.stats, a, 10, tesla.stats.chains, tesla.stats.chainFalloff);
+  assert.ok(pts.length >= 2, 'l’arc rebondit sur la cible voisine');
+  assert.ok(b.hp < b.maxHp);
+  const ev = g.drainEvents();
+  assert.ok(ev.some((e) => e.e === 'combo' && e.n === 'superconduct' && e.coop === 1));
+  const frost = towerAt(g, 1, 'frost', 1);
+  g.frostHit(b, 1, frost.stats, frost);
+  assert.ok(b.st.slow && b.st.slow.pct >= 0.3);
+});
+
+test('Paralysie : un ennemi étourdi ne bouge plus', () => {
+  const g = newGame();
+  startWave(g);
+  const e = g.spawnEnemy('runner', { dist: 100 });
+  g.applyStun(e, 1);
+  const d0 = e.dist;
+  for (let i = 0; i < 10; i++) g.step(DT);
+  assert.equal(e.dist, d0);
+  for (let i = 0; i < 30; i++) g.step(DT);
+  assert.ok(e.dist > d0, 'repart après la paralysie');
+  const boss = g.spawnEnemy('colossus');
+  g.applyStun(boss, 1);
+  assert.equal(boss.st.stun, null, 'les boss résistent');
+});
+
+test('bouclier : l’électricité fait double dégâts', () => {
+  const g = newGame();
+  startWave(g);
+  const e = g.spawnEnemy('shield');
+  const sh = e.shield;
+  g.damageEnemy(e, 10, { owners: [0], kind: 'chain' });
+  assert.ok(Math.abs(sh - e.shield - 20) < 1e-6);
+  assert.equal(e.hp, e.maxHp, 'les PV sont protégés');
+});
+
+test('fusion avancée : Sniper + Tesla de niveau 3 -> Railgun', () => {
+  const g = newGame();
+  const s = towerAt(g, 0, 'sniper', 3);
+  const t = towerAt(g, 0, 'tesla', 3);
+  const ev = run(g, [[0, { a: 'fuse', id: s.id, hybrid: t.id }]]);
+  const f = ev.find((e) => e.e === 'fusion');
+  assert.ok(f && f.hy === 'railgun');
+  assert.equal(g.towers.length, 1);
+  assert.equal(g.towers[0].type, 'railgun');
+  assert.equal(g.towers[0].level, 3);
+  assert.ok(g.towers[0].stats.detect && g.towers[0].stats.pierce > 10);
+  // les hybrides fusionnent ensuite entre eux
+  const s2 = towerAt(g, 0, 'sniper', 2);
+  const t2 = towerAt(g, 0, 'tesla', 2);
+  const ev2 = run(g, [[0, { a: 'fuse', id: s2.id, hybrid: t2.id }]]);
+  assert.ok(ev2.some((e) => e.e === 'err'), 'niveau 3 minimum');
+});
+
+test('fusion avancée : recette secrète selon la spécialisation', () => {
+  const g = newGame();
+  const m = towerAt(g, 0, 'mortar', 3, 'A');
+  const f = towerAt(g, 0, 'frost', 3);
+  run(g, [[0, { a: 'fuse', id: f.id, hybrid: m.id }]]);
+  assert.equal(g.towers[0].type, 'elemental', 'Mortier Napalm + Givre');
+  const g2 = newGame();
+  const m2 = towerAt(g2, 0, 'mortar', 3, 'C');
+  const f2 = towerAt(g2, 0, 'frost', 3);
+  run(g2, [[0, { a: 'fuse', id: m2.id, hybrid: f2.id }]]);
+  assert.equal(g2.towers[0].type, 'cryomortar');
+});
+
+test('fusion avancée entre joueurs : accord requis', () => {
+  const g = newGame();
+  const s = towerAt(g, 0, 'mg', 3);
+  const t = towerAt(g, 1, 'tesla', 3);
+  let ev = run(g, [[0, { a: 'fuse', id: s.id, hybrid: t.id }]]);
+  const req = ev.find((e) => e.e === 'fuseReq');
+  assert.ok(req && req.hy === 1);
+  assert.equal(g.towers.length, 2);
+  ev = run(g, [[1, { a: 'fuseReply', id: req.id, ok: true }]]);
+  assert.ok(ev.some((e) => e.e === 'fusion' && e.hy === 'plasma' && e.coop === 1));
+  assert.deepEqual(g.towers[0].owners.slice().sort(), [0, 1]);
+});
+
+test('Aura polaire : ralentit sans tirer', () => {
+  const g = newGame();
+  startWave(g);
+  const fr = towerAt(g, 0, 'frost', 3, 'B');
+  const e = g.spawnEnemy('runner', { dist: 10 });
+  e.x = fr.x + 20;
+  e.y = fr.y;
+  g.updateAura(fr, fr.stats, 1, 1);
+  assert.ok(e.st.slow);
+  assert.ok(e.hp < e.maxHp);
+});

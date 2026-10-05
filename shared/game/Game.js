@@ -26,7 +26,7 @@ import { TOWER_TYPES } from '../data/towers.js';
 import { ENEMY_INDEX } from '../data/enemies.js';
 import { getWaveDef, prepTime, waveReward, teamWaveReward, hpMult, countMult, intervalMult } from '../data/waves.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
-import { TEAM_ITEMS, SYNERGIES, ABILITIES, COOP, synergyWeight, FRATERNITY_NEED } from '../data/team.js';
+import { TEAM_ITEMS, SYNERGIES, ABILITIES, COOP, synergyWeight, synergyPower, FRATERNITY_NEED, ARSENAL_NEED } from '../data/team.js';
 import { RNG, buildPath, sanitizeName, sanitizeText, clamp } from '../util.js';
 import {
   WAVE_EVENTS,
@@ -195,6 +195,7 @@ export class Game {
         gifts: 0,
         bosses: 0,
         teamBuys: 0,
+        hybrids: 0,
       },
     };
   }
@@ -625,17 +626,16 @@ export class Game {
   // ---------------------------------------------------- Calculs tourelles
   recomputeTowers() {
     this.towersDirty = false;
-    const power = { canon: 0, mg: 0, sniper: 0, mortar: 0 };
+    const power = synergyPower(this.towers);
     const ppower = this.players.map(() => 0);
     for (const t of this.towers) {
       const w = synergyWeight(t.level);
-      power[t.type] = (power[t.type] || 0) + w;
       for (const o of t.owners) ppower[o] += w / t.owners.length;
     }
     const active = new Set();
     for (const syn of SYNERGIES) {
       if (syn.type && power[syn.type] >= syn.need) active.add(syn.id);
-      else if (syn.special === 'arsenal' && Object.values(power).every((v) => v > 0)) active.add(syn.id);
+      else if (syn.special === 'arsenal' && Object.values(power).filter((v) => v > 0).length >= ARSENAL_NEED) active.add(syn.id);
       else if (syn.special === 'fraternity' && ppower.filter((v) => v >= FRATERNITY_NEED).length >= 2) active.add(syn.id);
     }
     for (const id of active) if (!this.synergies.has(id)) this.emit({ e: 'synergy', id, on: 1 });
@@ -673,6 +673,7 @@ export class Game {
         airMult: t.stats.airMult,
       };
       t.src.splash = { ...t.src, kind: 'explosion' };
+      t.srcChain = { ...t.src, kind: 'chain' };
     }
     this.towersVersion++;
   }
@@ -980,6 +981,11 @@ export class Game {
         multi: s.multi,
         air: s.air ? 1 : 0,
         min: s.minRange,
+        chains: s.chains,
+        stun: Math.round(s.stun * 100) / 100,
+        slow: s.slow ? Math.round(s.slow.pct * 100) : 0,
+        detect: s.detect ? 1 : 0,
+        aura: s.aura ? 1 : 0,
       },
     };
   }
@@ -995,6 +1001,8 @@ export class Game {
     if (e.flying) f |= 64;
     if (e.stealth && !e.revealed) f |= 128;
     if (e.rush) f |= 256;
+    if (e.st.stun) f |= 512;
+    if (e.st.chill) f |= 1024;
     return f;
   }
 
@@ -1060,6 +1068,7 @@ export class Game {
         t: Math.ceil(r.t),
         tt: r.type,
         l: r.level,
+        hy: r.hybrid || null,
       })),
       syn: [...this.synergies],
       next: this.nextPreview,

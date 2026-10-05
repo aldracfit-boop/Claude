@@ -25,19 +25,26 @@ export function baseStats(t) {
     airMult: def.airMult || 1,
     crit: 0,
     critMult: 2,
-    pierce: 1,
+    pierce: def.pierceAll ? 99 : 1,
     pierceFalloff: 1,
     multi: 1,
     bossMult: 1,
     execute: 0,
-    slow: null,
-    burn: null,
+    slow: def.slow ? { ...def.slow } : null,
+    burn: def.burn ? { ...def.burn } : null,
     armorBreak: null,
     mark: null,
     napalm: null,
     frags: 0,
     ultimate: null,
     detect: !!def.detect,
+    chains: def.chains || 0,
+    chainRange: def.chainRange || 75,
+    chainFalloff: def.chainFalloff || 0.8,
+    stun: def.stun || 0,
+    chill: null,
+    aura: false,
+    hybrid: !!def.hybrid,
     dmgBonus: 0, // bonus additifs (coop, entraînement, auras)
   };
   for (let lv = 2; lv <= t.level; lv++) {
@@ -74,6 +81,16 @@ export function estimateDps(s) {
   let dps = s.damage * s.rate * critAvg * s.multi;
   if (s.burn) dps += s.damage * s.burn.dpsPct * s.multi * 0.5;
   if (s.frags) dps += s.damage * 0.35 * s.frags * s.rate * 0.4;
+  if (s.chains) {
+    let f = 1;
+    let extra = 0;
+    for (let k = 0; k < s.chains; k++) {
+      f *= s.chainFalloff;
+      extra += f;
+    }
+    dps += s.damage * s.rate * critAvg * extra * 0.5;
+  }
+  if (s.aura) dps = s.damage * s.rate * 0.7;
   return dps;
 }
 

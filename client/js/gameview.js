@@ -211,6 +211,17 @@ export class GameView {
           fx.mortar(ev.x1, ev.y1, ev.x2, ev.y2, ev.d, ev.l);
           fx.smoke(ev.x1, ev.y1 - 6, 1, 'rgba(160,160,170,0.5)');
           audio.play('mortar');
+        } else if (ev.k === 'frost') {
+          const ang = Math.atan2(ev.y2 - ev.y1, ev.x2 - ev.x1);
+          fx.tracer(ev.x1 + Math.cos(ang) * 14, ev.y1 + Math.sin(ang) * 14, ev.x2, ev.y2, 'rgba(190, 245, 255, 0.95)', 2.4, 0.14);
+          fx.burst(ev.x2, ev.y2, '#e6fbff', ev.sp ? 10 : 4, ev.sp ? 90 : 50, 0.35, 2);
+          if (ev.sp) fx.ring(ev.x2, ev.y2, 4, 40, 0.3, 'rgba(190, 245, 255, 0.8)', 2);
+          audio.play('frost');
+        } else if (ev.k === 'chain') {
+          const pts = ev.m ? ev.pts : [[ev.x1, ev.y1], ...(ev.pts || [])];
+          fx.lightning(pts, ev.m ? '#f0b3ff' : '#c8b6ff', ev.c ? 3 : ev.m ? 1.4 : 2, ev.c ? 0.3 : 0.16);
+          for (const [x, y] of ev.pts || []) fx.burst(x, y, '#e8e0ff', 3, 60, 0.2, 1.8, { glow: true });
+          audio.play('zap');
         } else if (ev.k === 'base') {
           this.renderer.cannonAngle = Math.atan2(ev.y2 - ev.y1, ev.x2 - ev.x1);
           fx.tracer(ev.x1, ev.y1, ev.x2, ev.y2, '#9fd3ff', 2.5, 0.12);
@@ -300,7 +311,13 @@ export class GameView {
         break;
       case 'fusion': {
         fx.fusion(ev);
-        audio.play('fusion', { rare: ev.promo || ev.r >= 3 });
+        audio.play('fusion', { rare: ev.promo || ev.r >= 3 || !!ev.hy });
+        if (ev.hy) {
+          const def = TOWER_TYPES[ev.tt];
+          const fresh = profile.discover(`recipe-${ev.hy}`);
+          this.hud.banner(def.name, fresh ? '⚗️ Nouvelle recette découverte !' : '⚗️ Fusion avancée', 'good');
+          fx.text(ev.x, ev.y - 70, def.name.toUpperCase(), '#e0b3ff', 18, { bold: true, important: true, life: 1.8 });
+        }
         if (ev.refund > 0 && this.isLocalPid(ev.p)) this.hud.toast(`Améliorations remboursées : +${ev.refund} or`, 'good');
         if (profile.discover(`fusion-${ev.tt}-${ev.l}`))
           this.hud.toast(`Nouvelle découverte : ${TOWER_TYPES[ev.tt].name} niveau ${ev.l} !`, 'good');
@@ -373,6 +390,17 @@ export class GameView {
             important: true,
           });
         audio.play('stomp');
+        break;
+      case 'aura': {
+        const t = this.state.towers.get(ev.id);
+        if (t) fx.ring(t.x, t.y, 10, t.st.range, 0.9, 'rgba(190, 245, 255, 0.35)', 2);
+        break;
+      }
+      case 'freezeZone':
+        fx.ring(ev.x, ev.y, 10, ev.r, 0.6, 'rgba(210, 250, 255, 0.95)', 5);
+        fx.flashes.push({ x: ev.x, y: ev.y, r: ev.r, t: 0, life: 0.4, local: true, color: '#d6f8ff' });
+        fx.text(ev.x, ev.y - 30, 'ZÉRO ABSOLU', '#d6f8ff', 15, { bold: true, important: true });
+        audio.play('freeze');
         break;
       case 'heal':
         fx.ring(ev.x, ev.y, 6, ev.r, 0.6, 'rgba(85, 239, 196, 0.9)', 3);
@@ -565,7 +593,8 @@ export class GameView {
     else fs.chosen.push(id);
     audio.play('select');
     if (fs.chosen.length >= fs.need) {
-      this.send({ a: 'fuse', id: fs.primaryId, partners: fs.chosen.slice(0, fs.need), core: fs.core });
+      if (fs.hybrid) this.send({ a: 'fuse', id: fs.primaryId, hybrid: fs.chosen[0] });
+      else this.send({ a: 'fuse', id: fs.primaryId, partners: fs.chosen.slice(0, fs.need), core: fs.core });
       this.ui.fusionSel = null;
     }
   }
@@ -644,6 +673,11 @@ export class GameView {
       branch: (id, b) => this.send({ a: 'branch', id, b }),
       fuse: (id, opts = {}) => this.send({ a: 'fuse', id, core: !!opts.core }),
       teamFuse: (id) => this.startTeamFusion(id),
+      hybrid: (id, partner) => this.send({ a: 'fuse', id, hybrid: partner }),
+      teamHybrid: (id, candidates) => {
+        this.cancelModes();
+        this.ui.fusionSel = { primaryId: id, candidates: new Set(candidates), chosen: [], need: 1, core: false, hybrid: true };
+      },
       team: (item) => {
         const it = TEAM_ITEMS[item];
         if (it && item !== 'repair' && item !== 'shield' && !confirm(`Acheter « ${it.name} » avec le trésor d’équipe ?`)) return;
@@ -725,7 +759,7 @@ export class GameView {
             'div.hint-line',
             h(
               'div',
-              h('kbd', '1-4'),
+              h('kbd', '1-6'),
               ' tourelles · ',
               h('kbd', 'Espace'),
               ' prêt · ',

@@ -88,6 +88,19 @@ export class Renderer {
       }
     }
 
+    // auras polaires (Givre spécialisé)
+    for (const t of state.towers.values()) {
+      if (!t.st.aura || t.dis) continue;
+      const rr = t.st.range * (snap.ev === 'storm' ? 0.85 : 1);
+      ctx.fillStyle = 'rgba(180, 240, 255, 0.07)';
+      ctx.strokeStyle = `rgba(190, 245, 255, ${0.25 + 0.1 * Math.sin(now / 300)})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, rr, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+    }
+
     // surbrillance de placement / déplacement
     const placing = ui.placing || ui.moving;
     if (placing) this.drawPlacementGrid(ctx, state, ui);

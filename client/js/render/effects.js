@@ -12,6 +12,7 @@ export class Effects {
   constructor() {
     this.particles = [];
     this.tracers = [];
+    this.bolts = [];
     this.shells = [];
     this.mortars = [];
     this.rings = [];
@@ -77,6 +78,12 @@ export class Effects {
   tracer(x1, y1, x2, y2, color, width = 1.5, life = 0.08) {
     if (this.tracers.length > 400) this.tracers.shift();
     this.tracers.push({ x1, y1, x2, y2, color, width, t: 0, life });
+  }
+
+  // Éclair : polyligne recalculée avec du bruit à chaque image (crépitement).
+  lightning(pts, color = '#d6ccff', width = 2, life = 0.18) {
+    if (this.bolts.length > 120) this.bolts.shift();
+    this.bolts.push({ pts, color, width, t: 0, life });
   }
 
   text(x, y, str, color = '#fff', size = 13, opts = {}) {
@@ -165,6 +172,8 @@ export class Effects {
     this.particles = this.particles.filter((p) => p.life > 0);
     for (const t of this.tracers) t.t += dt;
     this.tracers = this.tracers.filter((t) => t.t < t.life);
+    for (const b of this.bolts) b.t += dt;
+    this.bolts = this.bolts.filter((b) => b.t < b.life);
     for (const r of this.rings) r.t += dt;
     this.rings = this.rings.filter((r) => r.t < r.life);
     for (const t of this.texts) {
@@ -325,8 +334,38 @@ export class Effects {
       ctx.arc(s.x, s.y, s.mega ? 6 : 3 + (s.level || 1) * 0.3, 0, TAU);
       ctx.fill();
     }
-    // traçantes
+    // éclairs
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const b of this.bolts) {
+      const a = 1 - b.t / b.life;
+      for (const [w, col, al] of [
+        [b.width * 2.6, b.color, 0.25],
+        [b.width, '#ffffff', 0.95],
+      ]) {
+        ctx.globalAlpha = a * al;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        for (let i = 0; i < b.pts.length; i++) {
+          const [x, y] = b.pts[i];
+          if (i === 0) {
+            ctx.moveTo(x, y);
+            continue;
+          }
+          const [px, py] = b.pts[i - 1];
+          const segs = 4;
+          for (let k = 1; k <= segs; k++) {
+            const t = k / segs;
+            const j = k === segs ? 0 : 7;
+            ctx.lineTo(px + (x - px) * t + (Math.random() - 0.5) * j, py + (y - py) * t + (Math.random() - 0.5) * j);
+          }
+        }
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    // traçantes
     for (const t of this.tracers) {
       const a = 1 - t.t / t.life;
       ctx.globalAlpha = a;
