@@ -7,6 +7,7 @@ import { TILE, COLS, ROWS, PHASE, FUSION_COUNT, MAX_LEVEL, BRANCH_LEVEL } from '
 import { TOWER_TYPES, TOWER_IDS } from '../data/towers.js';
 import { ENEMY_IDS } from '../data/enemies.js';
 import { TEAM_ITEMS, ABILITIES } from '../data/team.js';
+import { MERCHANT_DEALS } from '../data/events.js';
 import { RNG } from '../util.js';
 import { upgradeCost, upgradeSlots, upgradesUsed } from './stats.js';
 
@@ -193,16 +194,21 @@ export class BotBrain {
     const steward = g.players.find((p) => p.bot || p.autopilot);
     if (steward && steward.id === this.pid) this.teamShop();
 
-    // 6. Dépenses.
+    // 6. Marchand : un Noyau de fusion est toujours une bonne affaire.
+    if (g.merchant && g.phase === PHASE.PREP && g.merchant.deals.includes('core') && !g.merchant.bought[this.pid].includes('core')) {
+      if (me.gold >= MERCHANT_DEALS.core.cost(Math.max(1, g.wave)) + 150) this.cmd({ a: 'merchant', deal: 'core' });
+    }
+
+    // 7. Dépenses.
     if (!fused) this.spend();
 
-    // 7. Communication.
+    // 8. Communication.
     if (g.phase === PHASE.WAVE && g.waveState && g.waveState.def.boss && this.saidBoss !== g.wave && this.pid === steward?.id) {
       this.saidBoss = g.wave;
       this.cmd({ a: 'chat', q: 2 });
     }
 
-    // 8. Prêt pour la vague suivante.
+    // 9. Prêt pour la vague suivante.
     if (g.phase === PHASE.PREP && !me.ready) this.cmd({ a: 'ready', v: true });
   }
 

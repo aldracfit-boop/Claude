@@ -25,6 +25,7 @@ import {
 import { TOWER_TYPES } from '../../shared/data/towers.js';
 import { ENEMY_TYPES, ENEMY_IDS } from '../../shared/data/enemies.js';
 import { ABILITIES, SYNERGIES, COMBOS, TEAM_ITEMS } from '../../shared/data/team.js';
+import { WAVE_EVENTS } from '../../shared/data/events.js';
 
 const ENEMY_DEFS = ENEMY_IDS.map((id) => ENEMY_TYPES[id]);
 
@@ -291,12 +292,33 @@ export class GameView {
           this.hud.toast(`Nouvelle découverte : ${TOWER_TYPES[ev.tt].name} niveau ${ev.l} !`, 'good');
         break;
       }
-      case 'waveStart':
+      case 'waveStart': {
         audio.play('waveStart');
+        const wev = ev.ev ? WAVE_EVENTS[ev.ev] : null;
         if (ev.boss) this.hud.banner(`Vague ${ev.w}`, ev.n || 'Boss', 'boss');
         else if (ev.mini) this.hud.banner(`Vague ${ev.w}`, `Mini-boss : ${ev.n}`, 'mini');
+        else if (wev) this.hud.banner(`Vague ${ev.w}`, `${wev.icon} ${wev.name} — ${wev.desc}`, 'mini');
         else this.hud.banner(`Vague ${ev.w}`, ev.n || null);
+        if (wev && wev.id === 'blackout') {
+          fx.flash('#000000', 0.45, 0.8);
+          audio.play('stomp');
+        }
         if (this.ui.moving) this.ui.moving = null;
+        break;
+      }
+      case 'merchant':
+        this.hud.toast('🧳 Un marchand ambulant est arrivé ! (panneau de gauche)', 'good');
+        audio.play('core');
+        break;
+      case 'deal':
+        this.hud.chat(null, ev.m, true);
+        if (ev.deal === 'polish') {
+          const R = RARITIES[ev.r];
+          fx.ring(ev.x, ev.y, 6, 50, 0.6, R.color, 4);
+          fx.burst(ev.x, ev.y, R.color, 24, 140, 0.7, 3, { glow: true });
+          fx.text(ev.x, ev.y - 28, `RARETÉ ${R.name.toUpperCase()} !`, R.color, 15, { bold: true, important: true });
+        }
+        if (this.isLocalPid(ev.p)) audio.play('upgrade');
         break;
       case 'waveEnd':
         audio.play('waveEnd');
@@ -621,6 +643,7 @@ export class GameView {
         else this.closeModal();
       },
       menu: () => this.showMenu(this.session.isLocal),
+      merchant: (deal, id) => this.send({ a: 'merchant', deal, id }),
     };
   }
 

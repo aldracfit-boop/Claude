@@ -377,6 +377,70 @@ test('fusionner ne fait pas perdre une synergie', () => {
   assert.ok(g.synergies.has('battery'), 'toujours active après fusion');
 });
 
+test('événements : tempête, invasion et panne', () => {
+  const g = newGame();
+  g.players[0].gold = 10000;
+  const tiles = freeTiles(g, 4);
+  for (const tl of tiles) place(g, 0, 'canon', tl);
+  g.nextEvent = 'storm';
+  run(g, [
+    [0, { a: 'ready', v: true }],
+    [1, { a: 'ready', v: true }],
+  ]);
+  assert.equal(g.rangeMult, 0.85);
+  assert.equal(g.snapshot(false).ev, 'storm');
+  // fin de vague : retour à la normale
+  g.waveState.qi = g.waveState.queue.length;
+  for (const e of g.enemies) e.dead = true;
+  g.step(DT);
+  assert.equal(g.rangeMult, 1);
+
+  const g2 = newGame();
+  g2.nextEvent = 'invasion';
+  const base = g2.computePreview(1).groups.reduce((a, [, n]) => a + n, 0);
+  run(g2, [
+    [0, { a: 'ready', v: true }],
+    [1, { a: 'ready', v: true }],
+  ]);
+  assert.ok(g2.waveState.queue.length > base + 10, 'des éclaireurs supplémentaires sont ajoutés');
+
+  const g3 = newGame();
+  g3.players[0].gold = 10000;
+  for (const tl of freeTiles(g3, 8)) place(g3, 0, 'mg', tl);
+  g3.nextEvent = 'blackout';
+  run(g3, [
+    [0, { a: 'ready', v: true }],
+    [1, { a: 'ready', v: true }],
+  ]);
+  assert.equal(g3.towers.filter((t) => t.disabledT > 0).length, 2);
+});
+
+test('marchand : achats uniques par joueur', () => {
+  const g = newGame();
+  const [tl] = freeTiles(g, 1);
+  const t = place(g, 0, 'sniper', tl);
+  g.players[0].gold = 5000;
+  g.merchant = { deals: ['core', 'polish', 'recharge'], bought: [[], []] };
+  run(g, [[0, { a: 'merchant', deal: 'core' }]]);
+  assert.equal(g.players[0].cores, 1);
+  const ev = run(g, [[0, { a: 'merchant', deal: 'core' }]]);
+  assert.ok(
+    ev.some((e) => e.e === 'err'),
+    'une seule fois par joueur',
+  );
+  const r0 = t.rarity;
+  run(g, [[0, { a: 'merchant', deal: 'polish', id: t.id }]]);
+  assert.equal(t.rarity, r0 + 1);
+  const ev2 = run(g, [[0, { a: 'merchant', deal: 'repair' }]]);
+  assert.ok(
+    ev2.some((e) => e.e === 'err'),
+    'offre non proposée',
+  );
+  g.players[1].gold = 5000;
+  run(g, [[1, { a: 'merchant', deal: 'core' }]]);
+  assert.equal(g.players[1].cores, 1, 'chaque joueur peut acheter');
+});
+
 test('instantané sérialisable en JSON', () => {
   const g = newGame();
   const [tl] = freeTiles(g, 1);

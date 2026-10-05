@@ -95,8 +95,9 @@ export class Renderer {
     // portée de la tourelle survolée / sélectionnée
     const sel = ui.selectedId ? state.towers.get(ui.selectedId) : null;
     const hov = ui.hoverTowerId && ui.hoverTowerId !== ui.selectedId ? state.towers.get(ui.hoverTowerId) : null;
-    if (sel) this.drawRange(ctx, sel.x, sel.y, sel.st.range, sel.st.min, PLAYER_COLORS[sel.o], 0.16);
-    if (hov) this.drawRange(ctx, hov.x, hov.y, hov.st.range, hov.st.min, '#ffffff', 0.07);
+    const rangeK = snap.ev === 'storm' ? 0.85 : 1;
+    if (sel) this.drawRange(ctx, sel.x, sel.y, sel.st.range * rangeK, sel.st.min, PLAYER_COLORS[sel.o], 0.16);
+    if (hov) this.drawRange(ctx, hov.x, hov.y, hov.st.range * rangeK, hov.st.min, '#ffffff', 0.07);
     if (sel) this.drawLinks(ctx, state, sel);
 
     // base
@@ -211,6 +212,9 @@ export class Renderer {
 
     this.fx.drawTexts(ctx);
 
+    // Tempête : pluie et assombrissement
+    if (snap.ev === 'storm') this.drawStorm(ctx, now);
+
     // effets plein écran
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const w = this.canvas.width / this.dpr;
@@ -224,6 +228,26 @@ export class Renderer {
       vg.addColorStop(1, `rgba(255,0,30,${a})`);
       ctx.fillStyle = vg;
       ctx.fillRect(0, 0, w, h);
+    }
+  }
+
+  drawStorm(ctx, now) {
+    ctx.fillStyle = 'rgba(20, 30, 50, 0.28)';
+    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+    ctx.strokeStyle = 'rgba(180, 200, 255, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const t = now / 1000;
+    for (let i = 0; i < 160; i++) {
+      const x = ((i * 97.13 + t * 260) % (WORLD_W + 100)) - 50;
+      const y = ((i * 53.7 + t * 900) % (WORLD_H + 60)) - 30;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 6, y + 16);
+    }
+    ctx.stroke();
+    if (Math.sin(t * 0.7) > 0.995) {
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fillRect(0, 0, WORLD_W, WORLD_H);
     }
   }
 

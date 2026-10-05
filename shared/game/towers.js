@@ -16,7 +16,7 @@ export const TowerMixin = {
     const dx = e.x - t.x;
     const dy = e.y - t.y;
     const d2 = dx * dx + dy * dy;
-    const reach = s.range + e.radius * 0.5;
+    const reach = s.range * this.rangeMult + e.radius * 0.5;
     if (d2 > reach * reach) return false;
     if (s.minRange && d2 < s.minRange * s.minRange) return false;
     return true;

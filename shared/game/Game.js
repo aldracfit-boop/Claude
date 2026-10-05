@@ -28,6 +28,17 @@ import { getWaveDef, prepTime, waveReward, teamWaveReward, hpMult, countMult, in
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { TEAM_ITEMS, SYNERGIES, ABILITIES, COOP, synergyWeight, FRATERNITY_NEED } from '../data/team.js';
 import { RNG, buildPath, sanitizeName, sanitizeText, clamp } from '../util.js';
+import {
+  WAVE_EVENTS,
+  WAVE_EVENT_IDS,
+  EVENT_CHANCE,
+  EVENT_MIN_WAVE,
+  MERCHANT_DEALS,
+  MERCHANT_DEAL_IDS,
+  MERCHANT_CHANCE,
+  MERCHANT_MIN_WAVE,
+  POLISH_MAX_RARITY,
+} from '../data/events.js';
 import { computeTowerStats, upgradeCost, upgradeSlots, upgradesUsed } from './stats.js';
 import { CombatMixin } from './combat.js';
 import { EnemyMixin } from './enemies.js';
@@ -94,6 +105,11 @@ export class Game {
     this.lastWaveSummary = null;
     this.result = null;
     this.history = [];
+    this.nextEvent = null;
+    this.waveEvent = null;
+    this.lastEventId = null;
+    this.merchant = null;
+    this.rangeMult = 1;
     this.nextPreview = this.computePreview(1);
   }
 
@@ -260,6 +276,8 @@ export class Game {
         return this.cmdPing(pid, c);
       case 'speed':
         return this.cmdSpeed(pid, c);
+      case 'merchant':
+        return this.cmdMerchant(pid, c);
       default:
         return this.error(pid, 'Commande inconnue.');
     }
@@ -534,6 +552,52 @@ export class Game {
     this.emit({ e: 'gift', p: pid, to: to.id, v: amount, m: `${p.name} a donné ${amount} or à ${to.name}.` });
   }
 
+  cmdMerchant(pid, c) {
+    const m = this.merchant;
+    if (!m || this.phase !== PHASE.PREP) return this.error(pid, 'Le marchand est parti.');
+    const deal = own(MERCHANT_DEALS, c.deal);
+    if (!deal || !m.deals.includes(deal.id)) return this.error(pid, 'Offre indisponible.');
+    if (m.bought[pid].includes(deal.id)) return this.error(pid, 'Vous avez déjà acheté cette offre.');
+    const p = this.players[pid];
+    let t = null;
+    if (deal.needsTower) {
+      t = this.towerById.get(c.id | 0);
+      if (!t || !t.owners.includes(pid)) return this.error(pid, 'Sélectionnez une de vos tourelles.');
+      if (t.rarity >= POLISH_MAX_RARITY) return this.error(pid, 'Rareté déjà maximale pour le marchand.');
+    }
+    const cost = deal.cost(Math.max(1, this.wave), t);
+    if (p.gold < cost) return this.error(pid, 'Pas assez d’or.');
+    if (deal.id === 'repair' && this.base.hp >= this.base.maxHp) return this.error(pid, 'La base est déjà intacte.');
+    p.gold -= cost;
+    m.bought[pid].push(deal.id);
+    switch (deal.id) {
+      case 'core':
+        p.cores++;
+        break;
+      case 'polish':
+        t.rarity++;
+        t.invested[pid] = (t.invested[pid] || 0) + cost;
+        this.towersDirty = true;
+        break;
+      case 'repair':
+        this.base.hp = Math.min(this.base.maxHp, this.base.hp + this.base.maxHp * 0.15);
+        break;
+      case 'recharge':
+        p.cds = p.cds.map(() => 0);
+        break;
+    }
+    this.emit({
+      e: 'deal',
+      p: pid,
+      deal: deal.id,
+      id: t ? t.id : 0,
+      x: t ? t.x : 0,
+      y: t ? t.y : 0,
+      r: t ? t.rarity : 0,
+      m: `${p.name} a acheté « ${deal.name} » au marchand.`,
+    });
+  }
+
   cmdChat(pid, c) {
     const p = this.players[pid];
     if (this.time - p.chatT < 0.6) return;
@@ -628,8 +692,28 @@ export class Game {
       name: def.name || null,
       boss: !!def.boss,
       mini: !!def.mini,
+      ev: this.nextEvent,
       groups: Object.entries(counts).map(([t, n]) => [ENEMY_INDEX[t], n]),
     };
+  }
+
+  // Tirage de l'événement de la prochaine vague et du marchand (pendant la préparation).
+  rollEvents(nextWave) {
+    this.nextEvent = null;
+    this.merchant = null;
+    const def = getWaveDef(nextWave, this.seed);
+    if (nextWave >= EVENT_MIN_WAVE && !def.boss && !def.mini && this.rng.next() < EVENT_CHANCE) {
+      const pool = WAVE_EVENT_IDS.filter((id) => id !== this.lastEventId);
+      this.nextEvent = pool[Math.floor(this.rng.next() * pool.length)];
+      this.lastEventId = this.nextEvent;
+    }
+    if (nextWave > MERCHANT_MIN_WAVE && this.rng.next() < MERCHANT_CHANCE) {
+      const pool = MERCHANT_DEAL_IDS.slice();
+      const deals = [];
+      while (deals.length < 3 && pool.length) deals.push(pool.splice(Math.floor(this.rng.next() * pool.length), 1)[0]);
+      this.merchant = { deals, bought: this.players.map(() => []) };
+      this.emit({ e: 'merchant', deals });
+    }
   }
 
   startWave() {
@@ -657,7 +741,25 @@ export class Game {
         queue.push({ time: g.d + k * interval, type: g.t, pathIdx: (gi + k) % this.paths.length, phases: def.bossPhases });
       }
     });
+    const ev = this.nextEvent ? WAVE_EVENTS[this.nextEvent] : null;
+    if (ev && ev.extra) {
+      const g = ev.extra(this.wave);
+      for (let k = 0; k < g.n; k++) queue.push({ time: g.d + k * g.i, type: g.t, pathIdx: k % this.paths.length });
+    }
     queue.sort((a, b) => a.time - b.time);
+    this.waveEvent = ev;
+    this.nextEvent = null;
+    this.merchant = null;
+    this.rangeMult = ev && ev.rangeMult ? ev.rangeMult : 1;
+    if (ev && ev.disable && this.towers.length) {
+      const n = Math.max(1, Math.round(this.towers.length * ev.disable.frac));
+      const pool = this.towers.slice();
+      for (let k = 0; k < n && pool.length; k++) {
+        const t = pool.splice(Math.floor(this.rng.next() * pool.length), 1)[0];
+        t.disabledT = Math.max(t.disabledT, ev.disable.dur);
+      }
+      this.towersVersion++;
+    }
     this.phase = PHASE.WAVE;
     this.timer = 0;
     this.waveState = {
@@ -675,7 +777,7 @@ export class Game {
     };
     for (const p of this.players) p.ready = false;
     this.nextPreview = null;
-    this.emit({ e: 'waveStart', w: this.wave, boss: def.boss ? 1 : 0, mini: def.mini ? 1 : 0, n: def.name || null });
+    this.emit({ e: 'waveStart', w: this.wave, boss: def.boss ? 1 : 0, mini: def.mini ? 1 : 0, n: def.name || null, ev: ev ? ev.id : null });
   }
 
   updateWaveSpawns(dt) {
@@ -698,7 +800,7 @@ export class Game {
     const w = this.wave;
     const ws = this.waveState;
     const perfect = ws.leaks === 0;
-    let reward = waveReward(w) * this.diff.gold;
+    let reward = waveReward(w) * this.diff.gold * (this.waveEvent && this.waveEvent.rewardMult ? this.waveEvent.rewardMult : 1);
     if (perfect) reward *= 1.25;
     reward += 15 * (this.team.generator || 0);
     reward = Math.round(reward);
@@ -725,6 +827,8 @@ export class Game {
     this.history.push({ w, hp: Math.round(this.base.hp), leaks: ws.leaks });
     this.emit({ e: 'waveEnd', ...summary });
     this.waveState = null;
+    this.waveEvent = null;
+    this.rangeMult = 1;
     this.projectiles.length = 0;
     this.zones.length = 0;
     this.delayed.length = 0;
@@ -735,6 +839,7 @@ export class Game {
     this.phase = PHASE.PREP;
     const nextDef = getWaveDef(w + 1, this.seed);
     this.timer = prepTime(w + 1, nextDef);
+    this.rollEvents(w + 1);
     this.nextPreview = this.computePreview(w + 1);
   }
 
@@ -954,6 +1059,8 @@ export class Game {
       })),
       syn: [...this.synergies],
       next: this.nextPreview,
+      ev: this.waveEvent ? this.waveEvent.id : null,
+      merchant: this.merchant ? { deals: this.merchant.deals, bought: this.merchant.bought } : null,
       remain: this.remaining(),
       zones: this.zones.map((z) => [z.id, Math.round(z.x), Math.round(z.y), Math.round(z.r), r1(z.t)]),
       tv: this.towersVersion,

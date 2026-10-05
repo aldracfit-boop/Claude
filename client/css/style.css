@@ -931,6 +931,30 @@ kbd {
   height: 18px;
 }
 
+.wave-event {
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: rgba(255, 169, 77, 0.1);
+  border: 1px solid rgba(255, 169, 77, 0.45);
+  font-size: 12px;
+  display: grid;
+  gap: 2px;
+}
+
+.wave-event b {
+  color: var(--warn);
+}
+
+.wave-event span {
+  color: var(--muted);
+}
+
+.tag.event {
+  background: rgba(255, 169, 77, 0.18);
+  color: var(--warn);
+}
+
 .syn-list {
   display: grid;
   gap: 5px;

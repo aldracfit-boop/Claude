@@ -15,7 +15,13 @@ export const EnemyMixin = {
     const flying = !!def.flying;
     const pathIdx = opts.pathIdx ?? 0;
     const path = flying ? this.airPaths[pathIdx % this.airPaths.length] : this.paths[pathIdx % this.paths.length];
-    let hp = def.hp * hpMult(w) * this.diff.hp * this.hpScale * this.tuning.hp;
+    let hp =
+      def.hp *
+      hpMult(w) *
+      this.diff.hp *
+      this.hpScale *
+      this.tuning.hp *
+      (this.waveEvent && this.waveEvent.hpMult ? this.waveEvent.hpMult : 1);
     if (def.boss && opts.phases === 2) hp *= 0.8;
     const e = {
       id: this.nextId++,
@@ -36,7 +42,12 @@ export const EnemyMixin = {
       y: 0,
       off: def.boss || def.miniboss ? 0 : this.rng.range(-8, 8) * (flying ? 1.8 : 1),
       bounty:
-        (def.bounty * bountyMult(w) * this.diff.gold * this.tuning.gold * (opts.minion && !def.minion ? 0.5 : 1)) /
+        (def.bounty *
+          bountyMult(w) *
+          this.diff.gold *
+          this.tuning.gold *
+          (this.waveEvent && this.waveEvent.bountyMult ? this.waveEvent.bountyMult : 1) *
+          (opts.minion && !def.minion ? 0.5 : 1)) /
         (def.boss || def.miniboss ? 1 : countMult(w)),
       damage: def.damagePct ? def.damagePct * this.base.maxHp : def.damage,
       radius: def.radius,

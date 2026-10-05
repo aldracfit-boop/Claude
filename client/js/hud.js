@@ -19,6 +19,7 @@ import { ENEMY_TYPES, ENEMY_IDS } from '../../shared/data/enemies.js';
 import { TEAM_ITEMS, TEAM_ITEM_IDS, SYNERGIES, ABILITIES, synergyWeight } from '../../shared/data/team.js';
 import { upgradeCost, upgradeSlots } from '../../shared/game/stats.js';
 import { towerIcon, enemyIcon } from './render/sprites.js';
+import { WAVE_EVENTS, MERCHANT_DEALS, POLISH_MAX_RARITY } from '../../shared/data/events.js';
 
 const ENEMY_DEFS = ENEMY_IDS.map((id) => ENEMY_TYPES[id]);
 
@@ -55,6 +56,7 @@ export class Hud {
     E.team = h('span', { style: { color: 'var(--team)', fontWeight: 700 }, title: 'Trésor d’équipe' });
     E.speed = h('button.icon-btn', { title: 'Vitesse ×2 (vote de toute l’équipe)', onclick: () => a.speed() }, '×1');
     E.diff = h('span.tag');
+    E.event = h('span.tag.event.hidden');
     E.pauseBtn = h('button.icon-btn', { title: 'Pause (P)', onclick: () => a.pause() }, '❚❚');
     const top = h(
       'div.topbar',
@@ -64,6 +66,7 @@ export class Hud {
       E.base,
       h('div.grow'),
       h('div.tb-block', E.gold, E.cores, E.team),
+      E.event,
       E.diff,
       E.speed,
       this.view.session.isLocal ? E.pauseBtn : null,
@@ -72,11 +75,13 @@ export class Hud {
     // Panneau gauche
     E.players = h('div');
     E.next = h('div.next-wave');
+    E.merchant = h('div.side-section.hidden');
     E.syn = h('div.syn-list');
     const left = h(
       'div.side.left',
       h('div.side-section', h('h5', 'Équipe'), E.players),
       h('div.side-section', h('h5', 'Prochaine vague'), E.next),
+      E.merchant,
       h('div.side-section', h('h5', 'Synergies'), E.syn),
     );
 
@@ -251,10 +256,17 @@ export class Hud {
     setText(E.speed, `×${snap.speed}`);
     toggleClass(E.speed, 'on', me && me.sv);
     setText(E.diff, `${DIFFICULTIES[snap.diff]?.name || ''} · ${MODES[snap.mode]?.name || ''}`);
+    const wev = snap.ev ? WAVE_EVENTS[snap.ev] : null;
+    toggleClass(E.event, 'hidden', !wev);
+    if (wev) {
+      setText(E.event, `${wev.icon} ${wev.name}`);
+      E.event.title = wev.desc;
+    }
     toggleClass(E.pauseBtn, 'on', this.view.session.paused);
 
     this.updatePlayers(snap, ui);
     this.updateNext(snap);
+    this.updateMerchant(state, ui, me);
     this.updateSynergies(state);
     this.updateBoss(snap);
     this.updateBottom(snap, ui, me);
@@ -336,8 +348,56 @@ export class Hud {
       requestAnimationFrame(() => enemyIcon(cv, def));
     }
     box.append(chips);
+    if (n.ev) {
+      const ev = WAVE_EVENTS[n.ev];
+      box.append(h('div.wave-event', h('b', `${ev.icon} Événement : ${ev.name}`), h('span', ev.desc)));
+    }
     if (n.groups.some(([ti]) => ENEMY_DEFS[ti].flying))
       box.append(h('div.hint-line', '🛩️ Volants : suivent le couloir aérien en pointillés.'));
+  }
+
+  updateMerchant(state, ui, me) {
+    const snap = state.snap;
+    const m = snap.merchant;
+    const el = this.el.merchant;
+    if (!m || !me) {
+      if (!el.classList.contains('hidden')) el.classList.add('hidden');
+      this.merchantKey = '';
+      return;
+    }
+    const t = ui.selectedId ? state.towers.get(ui.selectedId) : null;
+    const myTower = t && (t.os || [t.o]).includes(ui.me) ? t : null;
+    const bought = m.bought[ui.me] || [];
+    const wave = Math.max(1, snap.wave);
+    const key = `${m.deals}|${bought}|${myTower ? myTower.id + ':' + myTower.l + ':' + myTower.r : ''}|${Math.floor(me.gold / 5)}|${ui.me}`;
+    if (key === this.merchantKey) return;
+    this.merchantKey = key;
+    el.classList.remove('hidden');
+    const items = m.deals.map((id) => {
+      const d = MERCHANT_DEALS[id];
+      const tw = d.needsTower && myTower ? { level: myTower.l, rarity: myTower.r } : null;
+      const cost = d.cost(wave, tw);
+      const done = bought.includes(id);
+      let reason = '';
+      if (done) reason = 'Déjà acheté';
+      else if (d.needsTower && !myTower) reason = 'Sélectionnez une de vos tourelles';
+      else if (d.needsTower && myTower.r >= POLISH_MAX_RARITY) reason = 'Rareté maximale';
+      const btn = h(
+        'button.team-item',
+        { title: d.desc, onclick: () => this.actions.merchant(id, myTower ? myTower.id : 0) },
+        h('div.ic', d.icon),
+        h('div', h('b', d.name), h('span', reason || d.desc)),
+        h('span.cost.gold', done ? '✓' : `${cost}`),
+      );
+      btn.disabled = done || !!reason || me.gold < cost;
+      return btn;
+    });
+    put(
+      clear(el),
+      h('h5', '🧳 Marchand ambulant'),
+      h('div.team-shop', items),
+      h('div.hint-line', 'Il repart au début de la prochaine vague.'),
+    );
   }
 
   updateSynergies(state) {
