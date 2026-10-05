@@ -410,6 +410,7 @@ export function drawEnemy(ctx, e, now, o = {}) {
   }
   if (flying && !o.icon) ctx.translate(0, Math.sin(now / 220 + e.seed) * 2 - 4);
   const f = e.f || 0;
+  if (f & 128) ctx.globalAlpha *= 0.22 + 0.08 * Math.sin(now / 120 + e.seed);
   if (f & 16) drawGlow(ctx, 0, 0, r * 2.2, '#ffffff', 0.5);
   if (f & 32 && (d.boss || d.miniboss)) drawGlow(ctx, 0, 0, r * 2.4, '#ff3b3b', 0.55 + 0.2 * Math.sin(now / 90));
   const draw = ENEMIES[d.id] || ENEMIES.runner;
@@ -446,6 +447,22 @@ export function drawEnemy(ctx, e, now, o = {}) {
     }
     ctx.stroke();
     ctx.restore();
+  }
+  if (e.sh > 0) {
+    const k = e.msh ? e.sh / e.msh : 1;
+    ctx.strokeStyle = `rgba(110, 180, 255, ${0.35 + 0.5 * k})`;
+    ctx.lineWidth = 1.5 + k * 1.5;
+    ctx.beginPath();
+    for (let i = 0; i <= 6; i++) {
+      const a = (i * TAU) / 6 + now / 1500;
+      const x = Math.cos(a) * (r + 5);
+      const y = Math.sin(a) * (r + 5);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = `rgba(110, 180, 255, ${0.1 + 0.12 * k})`;
+    ctx.fill();
   }
   if (f & 4) {
     ctx.fillStyle = '#ffa94d';
@@ -615,6 +632,101 @@ const ENEMIES = {
     }
     ctx.stroke();
     eyes(ctx, e, r, 0.3, 0.22);
+  },
+  regen(ctx, e, r, d, now) {
+    const p = 1 + Math.sin(now / 160 + e.seed) * 0.06;
+    ctx.scale(p, p);
+    blob(ctx, r, d.color);
+    ctx.fillStyle = `rgba(220, 255, 230, ${0.65 + 0.3 * Math.sin(now / 200)})`;
+    ctx.fillRect(-r * 0.15, -r * 0.55, r * 0.3, r * 1.1);
+    ctx.fillRect(-r * 0.55, -r * 0.15, r * 1.1, r * 0.3);
+  },
+  shield(ctx, e, r, d) {
+    blob(ctx, r * 0.9, d.color);
+    eyes(ctx, e, r * 0.9, 0.32, 0.24);
+  },
+  stealth(ctx, e, r, d, now) {
+    ctx.rotate(e.angle || 0);
+    ctx.fillStyle = d.color;
+    ctx.beginPath();
+    ctx.moveTo(r * 1.3, 0);
+    ctx.quadraticCurveTo(0, -r * 1.1, -r * 1.1, -r * 0.6);
+    ctx.lineTo(-r * 0.6, 0);
+    ctx.lineTo(-r * 1.1, r * 0.6);
+    ctx.quadraticCurveTo(0, r * 1.1, r * 1.3, 0);
+    ctx.fill();
+    ctx.strokeStyle = '#57606f';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+    ctx.fillStyle = '#ff4757';
+    ctx.fillRect(r * 0.2, -r * 0.35, r * 0.5, r * 0.18);
+    ctx.fillRect(r * 0.2, r * 0.17, r * 0.5, r * 0.18);
+    if (!(e.f & 128)) {
+      ctx.globalAlpha *= 0.6 + 0.3 * Math.sin(now / 90);
+      ctx.strokeStyle = '#ffd166';
+      ctx.beginPath();
+      ctx.arc(0, 0, r + 4, 0, TAU);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  },
+  healer(ctx, e, r, d, now) {
+    ctx.save();
+    ctx.rotate(now / 700);
+    ctx.strokeStyle = 'rgba(85, 239, 196, 0.7)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 5, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    blob(ctx, r, d.color);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-r * 0.14, -r * 0.5, r * 0.28, r);
+    ctx.fillRect(-r * 0.5, -r * 0.14, r, r * 0.28);
+  },
+  kamikaze(ctx, e, r, d, now, f) {
+    if (f & 256) drawGlow(ctx, 0, 0, r * 2.4, '#ff6b35', 0.6 + 0.3 * Math.sin(now / 50));
+    blob(ctx, r, f & 256 ? '#ff5e3a' : d.color);
+    ctx.strokeStyle = '#3d2b1f';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -r);
+    ctx.quadraticCurveTo(r * 0.4, -r * 1.5, r * 0.15, -r * 1.75);
+    ctx.stroke();
+    drawGlow(ctx, r * 0.15, -r * 1.75, 6, '#ffd166', 0.6 + 0.4 * Math.random());
+    ctx.fillStyle = '#2d3436';
+    ctx.font = `bold ${Math.round(r)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('!', 0, 1);
+    ctx.textBaseline = 'alphabetic';
+  },
+  jammer(ctx, e, r, d, now) {
+    ctx.rotate(e.angle || 0);
+    ctx.fillStyle = shade(d.color, -0.2);
+    rrect(ctx, -r * 0.95, -r * 0.8, r * 1.9, r * 1.6, 4);
+    ctx.fill();
+    ctx.strokeStyle = shade(d.color, -0.6);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.save();
+    ctx.rotate(now / 300);
+    ctx.strokeStyle = '#ffeaa7';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.55, -0.9, 0.9);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(r * 0.6, 0);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#ffeaa7';
+    ctx.beginPath();
+    ctx.arc(0, 0, 2.2, 0, TAU);
+    ctx.fill();
   },
   shard(ctx, e, r, d, now) {
     ctx.rotate(now / 150 + e.seed);

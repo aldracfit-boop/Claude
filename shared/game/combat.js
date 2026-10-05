@@ -45,10 +45,18 @@ export const CombatMixin = {
         if (e.assault) dmg *= 1 + COOP.bossAssaultBonus;
       }
       if (e.flying) dmg *= src.airMult || 1;
+      if (e.shield > 0) {
+        dmg = this.hitShield(e, dmg, src);
+        if (dmg <= 0) return 0;
+      }
       const armor = st.brk ? 0 : Math.max(0, e.armor - (src.armorPierce || 0));
       dmg = Math.max(dmg * 0.15, dmg - armor);
-    } else if (st.mark) {
-      dmg *= 1.2;
+    } else {
+      if (st.mark) dmg *= 1.2;
+      if (e.shield > 0) {
+        dmg = this.hitShield(e, dmg, src);
+        if (dmg <= 0) return 0;
+      }
     }
 
     // Les boss ne peuvent pas « sauter » une phase : les PV sont bloqués au seuil.
@@ -68,6 +76,23 @@ export const CombatMixin = {
     this.creditDamage(e, dealt, src);
     if (e.hp <= 0) this.killEnemy(e, src);
     return dealt;
+  },
+
+  // Le bouclier absorbe les dégâts en premier. Retourne les dégâts restants pour les PV.
+  hitShield(e, dmg, src) {
+    const mult = src.kind === 'bullet' ? 1.5 : src.kind === 'explosion' ? 0.6 : 1;
+    const eff = dmg * mult;
+    e.shieldT = 0;
+    if (eff < e.shield) {
+      e.shield -= eff;
+      this.creditDamage(e, eff, src);
+      return 0;
+    }
+    const used = e.shield / mult;
+    this.creditDamage(e, e.shield, src);
+    e.shield = 0;
+    this.emit({ e: 'shieldBreak', x: Math.round(e.x), y: Math.round(e.y) });
+    return dmg - used;
   },
 
   creditDamage(e, dealt, src) {

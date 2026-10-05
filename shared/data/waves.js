@@ -15,7 +15,7 @@ export const CAMPAIGN = [
   /* 5 */ { mini: true, name: 'Le Mastodonte', groups: [g('runner', 10, 1.0), g('scout', 6, 0.7, 6), g('mastodon', 1, 1, 10)] },
   /* 6 */ { groups: [g('drone', 8, 1.5), g('runner', 12, 1.0, 3)], intro: 'drone' },
   /* 7 */ { groups: [g('splitter', 6, 2.2), g('scout', 14, 0.6, 5)], intro: 'splitter' },
-  /* 8 */ { groups: [g('tank', 5, 3), g('runner', 14, 0.9, 2), g('drone', 6, 1.4, 8)] },
+  /* 8 */ { groups: [g('tank', 5, 3), g('runner', 14, 0.9, 2), g('drone', 6, 1.4, 8), g('regen', 4, 2, 12)], intro: 'regen' },
   /* 9 */ { name: 'Invasion', groups: [g('scout', 36, 0.35), g('splitter', 6, 2, 8)] },
   /* 10 */ {
     boss: true,
@@ -23,20 +23,36 @@ export const CAMPAIGN = [
     bossPhases: 2,
     groups: [g('runner', 10, 1.5), g('colossus', 1, 1, 4), g('drone', 6, 1.5, 14)],
   },
-  /* 11 */ { groups: [g('runner', 20, 0.8), g('drone', 10, 1.2, 4)] },
-  /* 12 */ { groups: [g('tank', 9, 2.4), g('scout', 12, 0.6, 6)] },
-  /* 13 */ { groups: [g('splitter', 12, 1.4), g('drone', 12, 1.1, 3)] },
-  /* 14 */ { groups: [g('runner', 26, 0.6), g('tank', 7, 3, 4), g('scout', 18, 0.5, 10)] },
-  /* 15 */ { mini: true, name: 'La Nuée-mère', groups: [g('drone', 10, 1.2), g('tank', 4, 3, 3), g('broodmother', 1, 1, 8)] },
-  /* 16 */ { groups: [g('drone', 20, 0.8), g('splitter', 10, 1.6, 4)] },
-  /* 17 */ { groups: [g('tank', 13, 2), g('scout', 28, 0.4, 6)] },
-  /* 18 */ { groups: [g('runner', 24, 0.6), g('tank', 9, 2.5, 3), g('drone', 14, 1, 6), g('splitter', 9, 1.8, 10)] },
-  /* 19 */ { name: 'Assaut final', groups: [g('scout', 36, 0.35), g('tank', 14, 1.8, 3), g('drone', 18, 0.9, 6)] },
+  /* 11 */ { groups: [g('runner', 18, 0.8), g('regen', 8, 1.5, 3), g('drone', 8, 1.2, 6)] },
+  /* 12 */ { groups: [g('tank', 8, 2.4), g('shield', 10, 1.3, 3), g('scout', 10, 0.6, 8)], intro: 'shield' },
+  /* 13 */ { groups: [g('splitter', 10, 1.4), g('stealth', 8, 1.2, 4), g('drone', 10, 1.1, 6)], intro: 'stealth' },
+  /* 14 */ { groups: [g('runner', 22, 0.6), g('healer', 4, 3, 4), g('tank', 6, 3, 5), g('scout', 16, 0.5, 10)], intro: 'healer' },
+  /* 15 */ {
+    mini: true,
+    name: 'La Nuée-mère',
+    groups: [g('drone', 10, 1.2), g('regen', 6, 1.5, 2), g('shield', 6, 1.5, 4), g('broodmother', 1, 1, 8)],
+  },
+  /* 16 */ { groups: [g('drone', 18, 0.8), g('kamikaze', 10, 1.2, 4), g('splitter', 8, 1.6, 6)], intro: 'kamikaze' },
+  /* 17 */ { groups: [g('tank', 12, 2), g('jammer', 4, 3.5, 4), g('scout', 24, 0.4, 6)], intro: 'jammer' },
+  /* 18 */ {
+    groups: [g('runner', 20, 0.6), g('tank', 8, 2.5, 3), g('drone', 12, 1, 6), g('healer', 4, 3, 8), g('stealth', 8, 1, 10)],
+  },
+  /* 19 */ {
+    name: 'Assaut final',
+    groups: [
+      g('scout', 30, 0.35),
+      g('tank', 12, 1.8, 3),
+      g('shield', 7, 1.2, 5),
+      g('kamikaze', 6, 1.5, 7),
+      g('drone', 12, 0.9, 9),
+      g('jammer', 3, 4, 12),
+    ],
+  },
   /* 20 */ {
     boss: true,
     name: 'Le Colosse — Colère finale',
     bossPhases: 3,
-    groups: [g('runner', 16, 1), g('colossus', 1, 1, 5), g('tank', 6, 3, 10), g('drone', 10, 1.2, 14)],
+    groups: [g('runner', 16, 1), g('colossus', 1, 1, 5), g('tank', 6, 3, 10), g('healer', 3, 5, 12), g('drone', 10, 1.2, 14)],
   },
 ];
 
@@ -47,6 +63,12 @@ const ENDLESS_POOL = [
   { t: 'tank', cost: 5, i: 1.8 },
   { t: 'drone', cost: 2, i: 0.9 },
   { t: 'splitter', cost: 3.2, i: 1.4 },
+  { t: 'regen', cost: 2.4, i: 1.2 },
+  { t: 'shield', cost: 2.6, i: 1.1 },
+  { t: 'stealth', cost: 1.8, i: 0.9 },
+  { t: 'healer', cost: 4, i: 2.5, max: 6 },
+  { t: 'kamikaze', cost: 1.8, i: 1 },
+  { t: 'jammer', cost: 4.5, i: 3, max: 5 },
 ];
 
 export function getWaveDef(wave, seed = 1) {
@@ -63,7 +85,7 @@ export function getWaveDef(wave, seed = 1) {
   let delay = 0;
   for (const c of chosen) {
     const share = budget / chosen.length;
-    const n = Math.max(3, Math.min(60, Math.round(share / c.cost)));
+    const n = Math.max(3, Math.min(c.max || 60, Math.round(share / c.cost)));
     groups.push(g(c.t, n, c.i * Math.max(0.5, 1 - (wave - 20) * 0.01), delay));
     delay += rng.range(2, 6);
   }

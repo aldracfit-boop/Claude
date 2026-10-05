@@ -174,7 +174,7 @@ export class Renderer {
             glow: true,
           });
         }
-        if (e.hp < e.max && e.id !== bossId) this.drawHpBar(ctx, e);
+        if ((e.hp < e.max || e.msh > 0) && e.id !== bossId && !(e.f & 128)) this.drawHpBar(ctx, e);
         if (ui.hoverEnemyId === e.id) {
           ctx.strokeStyle = 'rgba(255,255,255,0.7)';
           ctx.lineWidth = 1.5;
@@ -381,6 +381,13 @@ export class Renderer {
     if (e.ar > 0) {
       ctx.fillStyle = e.f & 4 ? '#ffa94d' : '#c9d1d9';
       ctx.fillRect(x, y + 3, Math.min(w, e.ar * 2), 1);
+    }
+    if (e.msh > 0) {
+      const ks = Math.max(0, e.sh / e.msh);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(x - 1, y - 5, w + 2, 4);
+      ctx.fillStyle = '#6fb4ff';
+      ctx.fillRect(x, y - 4, w * ks, 2);
     }
   }
 }

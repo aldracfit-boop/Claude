@@ -154,6 +154,11 @@ export class BotBrain {
       if (!best || arr.length > best.n) best = { type, n: arr.length };
     }
     const up = this.upcoming();
+    // Furtifs : il faut des Snipers (détection) pour que toute l'équipe puisse les viser.
+    if (up.types.has('stealth')) {
+      const detectors = g.towers.filter((t) => t.stats && t.stats.detect).length;
+      if (detectors < 2 && this.rng.next() < 0.7) return 'sniper';
+    }
     const teamAir = g.towers.filter((t) => t.stats && t.stats.air).reduce((a, t) => a + t.level, 0);
     if (up.types.has('drone') && teamAir < 3 + g.wave * 0.5 && this.rng.next() < 0.6) {
       return this.style.focus.includes('mg') ? 'mg' : this.style.focus.includes('sniper') ? 'sniper' : 'canon';

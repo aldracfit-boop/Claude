@@ -993,6 +993,8 @@ export class Game {
     if (e.invulnT > 0) f |= 16;
     if (e.chargeT > 0 || (e.boss && e.phase >= 3)) f |= 32;
     if (e.flying) f |= 64;
+    if (e.stealth && !e.revealed) f |= 128;
+    if (e.rush) f |= 256;
     return f;
   }
 
@@ -1043,6 +1045,8 @@ export class Game {
           Math.ceil(e.maxHp),
           this.enemyFlags(e),
           Math.round(e.armor),
+          Math.ceil(e.shield),
+          Math.ceil(e.maxShield),
         ]),
       boss: this.bossInfo(),
       reqs: this.fusionRequests.map((r) => ({

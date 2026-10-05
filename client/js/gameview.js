@@ -132,6 +132,7 @@ export class GameView {
 
   onSnapshot(snap, now) {
     this.state.apply(snap, now);
+    this.introduceEnemies();
     this.ui.me = this.session.activePid;
     for (const ev of snap.events || []) {
       try {
@@ -151,6 +152,19 @@ export class GameView {
     if (snap.result && !this.ended) {
       this.ended = true;
       setTimeout(() => this.showEnd(snap.result), 1600);
+    }
+  }
+
+  // Présente chaque nouveau type d'ennemi la première fois qu'il apparaît dans la partie.
+  introduceEnemies() {
+    if (!this.seenEnemies) this.seenEnemies = new Set();
+    for (const e of this.state.enemies.values()) {
+      const d = e.def;
+      if (this.seenEnemies.has(d.id)) continue;
+      this.seenEnemies.add(d.id);
+      if (d.minion || d.boss || d.miniboss) continue;
+      if (['runner'].includes(d.id)) continue;
+      this.hud.toast(`Nouvel ennemi : ${d.name} — ${d.desc}`, 'team');
     }
   }
 
@@ -359,6 +373,24 @@ export class GameView {
             important: true,
           });
         audio.play('stomp');
+        break;
+      case 'heal':
+        fx.ring(ev.x, ev.y, 6, ev.r, 0.6, 'rgba(85, 239, 196, 0.9)', 3);
+        for (let i = 0; i < 8; i++)
+          fx.text(ev.x + (Math.random() - 0.5) * ev.r, ev.y + (Math.random() - 0.5) * ev.r, '+', '#55efc4', 14, { life: 0.6 });
+        break;
+      case 'jam':
+        fx.ring(ev.x, ev.y, 6, ev.r, 0.5, 'rgba(232, 67, 147, 0.9)', 4);
+        if (ev.n) fx.text(ev.x, ev.y - 30, 'BROUILLAGE !', '#fd79a8', 13, { bold: true });
+        audio.play('err');
+        break;
+      case 'rush':
+        fx.text(ev.x, ev.y - 22, 'KAMIKAZE !', '#ff7f50', 13, { bold: true });
+        fx.burst(ev.x, ev.y, '#ff7f50', 10, 90, 0.4, 2.5, { glow: true });
+        break;
+      case 'shieldBreak':
+        fx.burst(ev.x, ev.y, '#8ec5ff', 12, 110, 0.4, 2.5);
+        fx.ring(ev.x, ev.y, 6, 26, 0.3, '#8ec5ff', 2);
         break;
       case 'charge':
         fx.text(ev.x, ev.y - 34, 'CHARGE !', '#ff6b6b', 15, { bold: true });

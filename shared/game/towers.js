@@ -8,7 +8,29 @@ const r0 = (v) => Math.round(v);
 
 export const TowerMixin = {
   canTarget(s, e) {
+    if (e.stealth && !e.revealed) return false;
     return e.flying ? s.air : s.ground;
+  },
+
+  // Les Snipers (et les tourelles qui détectent) révèlent les ennemis furtifs à portée,
+  // pour toute l'équipe. Une cible marquée reste visible.
+  updateStealth() {
+    let detectors = null;
+    for (const e of this.enemies) {
+      if (!e.stealth || e.dead) continue;
+      if (!detectors) detectors = this.towers.filter((t) => t.stats && t.stats.detect && t.disabledT <= 0);
+      let rev = !!e.st.mark;
+      for (let i = 0; !rev && i < detectors.length; i++) {
+        const t = detectors[i];
+        const r = t.stats.range * this.rangeMult;
+        if ((t.x - e.x) ** 2 + (t.y - e.y) ** 2 <= r * r) rev = true;
+      }
+      if (!rev && this.base.cannonLvl > 0) {
+        const r = BASE_CANNON.range;
+        if ((this.basePos.x - e.x) ** 2 + (this.basePos.y - e.y) ** 2 <= r * r) rev = true;
+      }
+      e.revealed = rev;
+    }
   },
 
   inRange(t, s, e) {
@@ -70,6 +92,7 @@ export const TowerMixin = {
   },
 
   updateTowers(dt) {
+    this.updateStealth();
     for (const t of this.towers) {
       if (t.disabledT > 0) {
         t.disabledT -= dt;

@@ -1673,7 +1673,8 @@ kbd {
   border: 1px solid var(--line2);
   font-size: 13px;
   animation: toast 2.4s forwards;
-  white-space: nowrap;
+  max-width: min(640px, 92vw);
+  text-align: center;
 }
 
 .toast.err {

@@ -57,7 +57,13 @@ export const EnemyMixin = {
       assault: false,
       invulnT: 0,
       comboT: -99,
-      specT: def.special ? def.special.cd * 0.6 : 0,
+      specT: def.special && def.special.cd ? def.special.cd * 0.6 : 0,
+      shield: 0,
+      maxShield: 0,
+      shieldT: 0,
+      stealth: !!def.stealth,
+      revealed: !def.stealth,
+      rush: false,
       chargeT: 0,
       boss: !!def.boss,
       mini: !!def.miniboss,
@@ -68,6 +74,9 @@ export const EnemyMixin = {
       dead: false,
       leaked: false,
     };
+    if (def.special && def.special.kind === 'shield') {
+      e.maxShield = e.shield = hp * def.special.amount;
+    }
     this.updateEnemyPos(e);
     this.enemies.push(e);
     this.enemyById.set(e.id, e);
@@ -114,7 +123,20 @@ export const EnemyMixin = {
       }
       if (e.invulnT > 0) e.invulnT -= dt;
 
-      if (e.def.special) this.enemySpecial(e, dt);
+      const sp = e.def.special;
+      if (sp) {
+        if (sp.kind === 'regen') {
+          if (!st.burn && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * sp.pct * dt);
+        } else if (sp.kind === 'shield') {
+          e.shieldT += dt;
+          if (e.shieldT >= sp.delay && e.shield < e.maxShield) e.shield = Math.min(e.maxShield, e.shield + e.maxShield * sp.regen * dt);
+        } else if (sp.kind === 'rush') {
+          if (!e.rush && e.dist / e.path.length >= sp.at) {
+            e.rush = true;
+            this.emit({ e: 'rush', x: Math.round(e.x), y: Math.round(e.y) });
+          }
+        } else this.enemySpecial(e, dt);
+      }
       if (e.boss) this.bossUpdate(e, dt);
       if (e.dead) continue;
 
@@ -124,6 +146,7 @@ export const EnemyMixin = {
         spd *= e.def.special.mult;
         e.chargeT -= dt;
       }
+      if (e.rush) spd *= e.def.special.mult;
       if (e.boss) {
         const ph = e.def.phases[e.phase - 1];
         if (ph.speedMult) spd *= ph.speedMult;
@@ -147,6 +170,28 @@ export const EnemyMixin = {
     if (sp.kind === 'charge') {
       e.chargeT = sp.dur;
       this.emit({ e: 'charge', id: e.id, x: Math.round(e.x), y: Math.round(e.y) });
+    } else if (sp.kind === 'heal') {
+      const r2 = sp.radius * sp.radius;
+      let n = 0;
+      for (const f of this.enemies) {
+        if (f.dead || f.hp >= f.maxHp) continue;
+        if ((f.x - e.x) ** 2 + (f.y - e.y) ** 2 > r2) continue;
+        const pct = f.boss || f.mini ? sp.pct * 0.2 : f === e ? sp.pct * 0.5 : sp.pct;
+        f.hp = Math.min(f.maxHp, f.hp + f.maxHp * pct);
+        n++;
+      }
+      this.emit({ e: 'heal', x: Math.round(e.x), y: Math.round(e.y), r: sp.radius, n });
+    } else if (sp.kind === 'jam') {
+      const r2 = sp.radius * sp.radius;
+      let n = 0;
+      for (const t of this.towers) {
+        if ((t.x - e.x) ** 2 + (t.y - e.y) ** 2 <= r2) {
+          if (t.disabledT <= 0) n++;
+          t.disabledT = Math.max(t.disabledT, sp.dur);
+        }
+      }
+      if (n) this.towersVersion++;
+      this.emit({ e: 'jam', x: Math.round(e.x), y: Math.round(e.y), r: sp.radius, n });
     } else if (sp.kind === 'spawn') {
       for (let k = 0; k < sp.count; k++) {
         this.spawnEnemy(sp.type, { pathIdx: e.pathIdx, dist: Math.max(0, e.dist - 6 - k * 10), minion: true });

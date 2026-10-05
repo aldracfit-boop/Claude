@@ -37,6 +37,7 @@ export function baseStats(t) {
     napalm: null,
     frags: 0,
     ultimate: null,
+    detect: !!def.detect,
     dmgBonus: 0, // bonus additifs (coop, entraînement, auras)
   };
   for (let lv = 2; lv <= t.level; lv++) {

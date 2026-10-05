@@ -37,6 +37,8 @@ export class ClientState {
           max: a[5],
           f: a[6],
           ar: a[7],
+          sh: a[8] || 0,
+          msh: a[9] || 0,
           angle: 0,
           born: now,
           hitT: -1,
@@ -47,11 +49,13 @@ export class ClientState {
         e.py = e.ry;
         e.x = a[2];
         e.y = a[3];
-        if (a[4] < e.hp) e.hitT = now;
+        if (a[4] < e.hp || (a[8] || 0) < e.sh) e.hitT = now;
         e.hp = a[4];
         e.max = a[5];
         e.f = a[6];
         e.ar = a[7];
+        e.sh = a[8] || 0;
+        e.msh = a[9] || 0;
       }
       const dx = e.x - e.px;
       const dy = e.y - e.py;
